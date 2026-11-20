@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - labs/*/ts
+  - labs/contract
+  - packages/trace/ts
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

@@ -1,0 +1,2 @@
+CREATE DATABASE academy_test;
+CREATE DATABASE labs;
