@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { ProgressProvider } from "@/components/game/ProgressProvider";
+import { Toaster } from "@/components/game/Toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { currentUser } from "@/lib/auth/session";
+import { getProgress } from "@/lib/game/award";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -13,7 +18,10 @@ export const metadata: Metadata = {
 // Runs before paint so the saved (or system) theme applies without a flash.
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // UTC here; ProgressProvider refetches with the browser timezone on mount.
+  const user = await currentUser();
+  const initial = user ? await getProgress(user.id, "UTC") : null;
   return (
     <html
       lang="en"
@@ -23,7 +31,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <TooltipProvider>{initial ? <ProgressProvider initial={initial}>{children}</ProgressProvider> : children}</TooltipProvider>
+        <Toaster />
+      </body>
     </html>
   );
 }

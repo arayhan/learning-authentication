@@ -1,10 +1,16 @@
-import { ThemeToggle } from "@/components/shell/theme-toggle";
+import { redirect } from "next/navigation";
+import { Dashboard } from "@/components/game/Dashboard";
+import { AppShell } from "@/components/shell/AppShell";
+import { ModuleNav } from "@/components/shell/ModuleNav";
+import { XpGuide } from "@/components/shell/XpGuide";
+import { currentUser } from "@/lib/auth/session";
 
-export default function Home() {
+export default async function Home() {
+  const user = await currentUser();
+  if (!user) redirect("/login");
   return (
-    <main className="flex flex-1 items-center justify-center gap-4">
-      <h1 className="text-3xl font-semibold tracking-tight">Auth Academy</h1>
-      <ThemeToggle />
-    </main>
+    <AppShell userName={user.displayName} left={<ModuleNav />} right={<XpGuide />} rightTitle="XP guide">
+      <Dashboard name={user.displayName} />
+    </AppShell>
   );
 }
