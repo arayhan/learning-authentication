@@ -6,8 +6,9 @@ Local learning platform for authentication: a Next.js academy app plus Go and Ty
 
 ```bash
 pnpm i
-docker compose up -d                        # Postgres 17 on localhost:5433
-pnpm --filter academy drizzle-kit migrate   # create the academy tables
+cp apps/academy/.env.example apps/academy/.env.local   # first time only
+docker compose up -d --wait                 # Postgres 17 on localhost:5433 (waits until healthy)
+pnpm --filter academy exec drizzle-kit migrate   # create the academy tables
 pnpm dev                                    # academy on http://localhost:3000
 pnpm lab 01                                 # a lab server (Go by default, add --ts for TypeScript)
 ```
