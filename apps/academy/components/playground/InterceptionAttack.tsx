@@ -17,17 +17,17 @@ type Outcome = { code: string; status: number; body: string };
 const SLOTS: Record<Slot, { state: string; open: string; replay: string; title: string; blurb: string }> = {
   vulnerable: {
     state: "m3-l4-vulnerable",
-    open: "Open the authorize page without PKCE",
-    replay: "Replay the code without PKCE",
-    title: "Flow A: no PKCE (vulnerable mode)",
-    blurb: "The app sends no code_challenge, so the code is not bound to anything the attacker lacks.",
+    open: "Buka halaman authorize tanpa PKCE",
+    replay: "Replay code tanpa PKCE",
+    title: "Flow A: tanpa PKCE (mode vulnerable)",
+    blurb: "App nggak mengirim code_challenge, jadi code nggak terikat ke apa pun yang nggak dimiliki attacker.",
   },
   secure: {
     state: "m3-l4-secure",
-    open: "Open the authorize page with PKCE",
-    replay: "Replay the code with PKCE",
-    title: "Flow B: PKCE with S256 (secure)",
-    blurb: "The app sends a code_challenge. The matching verifier never left the app, so a stolen code is not enough.",
+    open: "Buka halaman authorize dengan PKCE",
+    replay: "Replay code dengan PKCE",
+    title: "Flow B: PKCE dengan S256 (secure)",
+    blurb: "App mengirim code_challenge. Verifier yang cocok nggak pernah keluar dari app, jadi code curian saja nggak cukup.",
   },
 };
 
@@ -119,8 +119,8 @@ export function InterceptionAttack() {
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold">Authorization code interception, live</h3>
-        <p className="text-xs text-muted-foreground">Runs against the lab at {labBase("03", impl)}. Each flow ends with a code in a redirect URL, which is exactly what the malicious app sees.</p>
+        <h3 className="text-sm font-semibold">Authorization code interception, langsung</h3>
+        <p className="text-xs text-muted-foreground">Jalan di lab pada {labBase("03", impl)}. Tiap flow berakhir dengan code di redirect URL, persis yang dilihat malicious app.</p>
       </div>
 
       <Diagram impl={impl} />
@@ -134,12 +134,12 @@ export function InterceptionAttack() {
               <section aria-label={SLOTS[s].title} className="space-y-2 rounded-md border bg-muted/30 p-3">
                 <p className="font-semibold">{SLOTS[s].title}</p>
                 <p className="text-xs text-muted-foreground">{SLOTS[s].blurb}</p>
-                <p className="text-xs text-muted-foreground">Open the page, sign in as alice@example.com (password correct-horse-battery) and approve. The code is picked up from the lab trace.</p>
+                <p className="text-xs text-muted-foreground">Buka halamannya, login sebagai alice@example.com (password correct-horse-battery) lalu setujui. Code-nya diambil dari trace lab.</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => open(s)}>{SLOTS[s].open}</Button>
                   <Button size="sm" disabled={!codes[s] || busy === s} onClick={() => void replay(s)}>{SLOTS[s].replay}</Button>
                 </div>
-                <p className="font-mono text-xs break-all text-muted-foreground">{codes[s] ? `code seen: ${codes[s]}` : "waiting for the redirect…"}</p>
+                <p className="font-mono text-xs break-all text-muted-foreground">{codes[s] ? `code terlihat: ${codes[s]}` : "menunggu redirect…"}</p>
                 {out && (
                   <div aria-live="polite" className="space-y-1 rounded border bg-background p-2">
                     <p className="font-mono text-xs text-muted-foreground">Malicious app: POST /__attack/intercept</p>
@@ -147,8 +147,8 @@ export function InterceptionAttack() {
                     <p className="font-mono text-xs break-all">{out.body}</p>
                     <p className="text-xs">
                       {s === "vulnerable"
-                        ? out.status === 200 ? "The attacker got an access token for alice. A code with no challenge is a bearer secret." : "Unexpected for this attack."
-                        : out.status === 400 ? "invalid_grant. The attacker has the code but cannot produce the verifier, and a failed guess does not burn the real app's code." : "Unexpected for this attack."}
+                        ? out.status === 200 ? "Attacker dapat access token milik alice. Code tanpa challenge itu bearer secret." : "Di luar dugaan untuk attack ini."
+                        : out.status === 400 ? "invalid_grant. Attacker punya code-nya tapi nggak bisa menghasilkan verifier, dan tebakan yang gagal nggak menghanguskan code milik app asli." : "Di luar dugaan untuk attack ini."}
                     </p>
                   </div>
                 )}
@@ -158,11 +158,11 @@ export function InterceptionAttack() {
         })}
       </ol>
 
-      {expected && <p className="text-sm font-medium">Same attacker, same capture, opposite outcome: only the PKCE challenge differs.</p>}
+      {expected && <p className="text-sm font-medium">Attacker sama, tangkapan sama, hasil berlawanan: yang beda cuma PKCE challenge.</p>}
       {sender.awaitingLogin && (
         <div className="flex items-center gap-2">
-          <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
-          <Button variant="outline" size="sm" disabled={sender.busy} onClick={sender.openReauth}>Sign in again</Button>
+          <p role="status" className="text-sm text-muted-foreground">Login lagi buat nyimpen progress kamu.</p>
+          <Button variant="outline" size="sm" disabled={sender.busy} onClick={sender.openReauth}>Login lagi</Button>
         </div>
       )}
     </div>
@@ -173,21 +173,21 @@ export function InterceptionAttack() {
 function Diagram({ impl }: { impl: Impl }) {
   const box = "rounded-md border bg-background px-2 py-1.5 text-center text-xs";
   return (
-    <figure aria-label="Interception diagram" className="space-y-2 rounded-md border p-3">
+    <figure aria-label="Diagram interception" className="space-y-2 rounded-md border p-3">
       <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-xs">
-        <div className={box}><p className="font-semibold">Bank app</p><p className="text-muted-foreground">claims bankapp://</p></div>
+        <div className={box}><p className="font-semibold">Bank app</p><p className="text-muted-foreground">mengklaim bankapp://</p></div>
         <span aria-hidden>→</span>
-        <div className={box}><p className="font-semibold">System browser</p><p className="text-muted-foreground">user approves</p></div>
+        <div className={box}><p className="font-semibold">System browser</p><p className="text-muted-foreground">user menyetujui</p></div>
         <span aria-hidden>→</span>
         <div className={box}><p className="font-semibold">Authorization server</p><p className="text-muted-foreground">{labBase("03", impl).replace("http://", "")}</p></div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">↓ 302 to bankapp://callback?code=…</p>
+      <p className="text-center text-xs text-muted-foreground">↓ 302 ke bankapp://callback?code=…</p>
       <div className="grid grid-cols-2 gap-2">
-        <div className={box}><p className="font-semibold">Bank app</p><p className="text-muted-foreground">expected recipient</p></div>
-        <div className={`${box} border-dashed border-destructive/60`}><p className="font-semibold text-destructive">Malicious app</p><p className="text-muted-foreground">also claims bankapp://</p></div>
+        <div className={box}><p className="font-semibold">Bank app</p><p className="text-muted-foreground">penerima seharusnya</p></div>
+        <div className={`${box} border-dashed border-destructive/60`}><p className="font-semibold text-destructive">Malicious app</p><p className="text-muted-foreground">juga mengklaim bankapp://</p></div>
       </div>
       <figcaption className="text-xs text-muted-foreground">
-        Custom schemes are not unique: any installed app can claim one (RFC 8252 section 8.6). In the lab the browser lands on {clientBase(impl)}/callback and the code is read from the trace instead.
+        Custom scheme itu nggak unik: app apa pun yang terpasang bisa mengklaimnya (RFC 8252 section 8.6). Di lab, browser mendarat di {clientBase(impl)}/callback dan code-nya dibaca dari trace.
       </figcaption>
     </figure>
   );

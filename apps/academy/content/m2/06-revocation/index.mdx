@@ -1,83 +1,83 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    A user clicks **Log out**. Or support disables an account. Or someone reports a stolen laptop. Surely every token for that user stops working right now?
+  <Step id="hook" title="Pembuka">
+    User klik **Logout**. Atau support menonaktifkan sebuah akun. Atau ada yang melapor laptopnya dicuri. Pasti semua token milik user itu langsung berhenti berfungsi, kan?
 
-    Not with a self-contained token. This is the price of lesson 1's design, and it is the most common wrong answer in JWT interviews: "we just delete it on logout".
+    Nggak untuk token self-contained. Ini harga dari desain di lesson 1, dan ini jawaban salah yang paling sering muncul di interview JWT: "ya tinggal kita hapus aja pas logout".
 
-    <Analogy title="The cancelled card at an offline shop">
-      The bank cancels your lost card, but a shop with no network connection checks only the printed expiry date. It happily accepts the card until that date passes. The only ways to close the gap are short expiry dates, or shops that phone the bank.
+    <Analogy title="Kartu yang sudah diblokir di toko offline">
+      Bank memblokir kartu kamu yang hilang, tapi toko yang mesin EDC-nya sedang offline cuma mengecek tanggal berlaku di kartu. Kartunya tetap diterima dengan senang hati sampai tanggal itu lewat. Cara menutup celahnya cuma dua: masa berlaku yang pendek, atau toko yang telepon bank dulu.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    An API that verifies a JWT offline asks nobody. Nothing the server does after issuing the token can reach it: the token is valid until `exp`, and that is by design.
+  <Step id="concept" title="Konsep">
+    API yang memverifikasi JWT secara offline nggak bertanya ke siapa pun. Apa pun yang dilakukan server setelah menerbitkan token nggak bisa menjangkaunya: token valid sampai `exp`, dan itu memang disengaja.
 
     <SequenceFlow flow={flows.revocation} />
 
-    So "logout" really means two different things, and it helps to keep them apart.
+    Jadi "logout" sebenarnya berarti dua hal berbeda, dan sebaiknya dipisahkan.
 
-    | | What it does | Effect |
+    | | Yang dilakukan | Efek |
     |---|---|---|
-    | **Refresh token revocation** | Marks the refresh family revoked and clears the cookie | No new access tokens can be issued. Takes effect at once |
-    | **Access token expiry** | The token simply runs out | Up to `expires_in` seconds later: 5 minutes in the lab |
+    | **Revoke refresh token** | Menandai refresh family sebagai revoked dan menghapus cookie | Access token baru nggak bisa diterbitkan lagi. Berlaku seketika |
+    | **Access token expiry** | Token habis sendiri | Paling lama `expires_in` detik kemudian: 5 menit di lab |
 
-    The logout is complete after the access token's remaining lifetime. A client should also throw its copy away, but that protects nothing against someone who already copied it.
+    Logout baru tuntas setelah sisa umur access token habis. Client juga sebaiknya membuang salinannya, tapi itu nggak melindungi apa pun dari orang yang sudah menyalinnya.
 
-    Claims go stale in the same way. If a user is demoted or disabled, a token issued before that still says the old role until it expires.
+    Claims juga basi dengan cara yang sama. Kalau user diturunkan perannya atau dinonaktifkan, token yang diterbitkan sebelumnya masih menyebut peran lama sampai expired.
   </Step>
 
-  <Step id="strategies" title="Strategies">
-    There is a menu, and every item reintroduces some state.
+  <Step id="strategies" title="Strategi">
+    Ada beberapa pilihan, dan semuanya memunculkan kembali sebagian state.
 
-    | Strategy | How it works | Cost |
+    | Strategi | Cara kerja | Biaya |
     |---|---|---|
-    | **Short lifetime** | Accept the staleness: `exp` is minutes away | More refreshes. The floor on exposure never reaches zero |
-    | **Revoke the refresh token** (the lab) | Delete or mark the refresh family | Access tokens still live until `exp` |
-    | **Deny list** | Store revoked `jti` values, or session ids, and check each request | A lookup per call. Entries only need to live until `exp` |
-    | **Token introspection** | The API asks the authorization server whether the token is active (RFC 7662) | A network call per request, and a runtime dependency |
-    | **"Valid after" per user** | Store one timestamp per user, reject tokens with an older `iat` | One small lookup per request. Gives "log out everywhere" and "password changed" |
-    | **Opaque reference tokens** | Do not use a JWT: the token is a random id looked up on each call | Back to Module 1's sessions, with all their properties |
+    | **Umur pendek** | Terima ketidakbaruan datanya: `exp` tinggal beberapa menit | Refresh lebih sering. Batas bawah risikonya nggak pernah nol |
+    | **Revoke refresh token** (yang dipakai lab) | Hapus atau tandai refresh family | Access token tetap hidup sampai `exp` |
+    | **Deny list** | Simpan nilai `jti` atau session id yang di-revoke, lalu cek tiap request | Satu lookup per call. Entri cukup hidup sampai `exp` |
+    | **Token introspection** | API bertanya ke authorization server apakah token masih aktif (RFC 7662) | Satu network call per request, dan dependency saat runtime |
+    | **"Valid after" per user** | Simpan satu timestamp per user, tolak token dengan `iat` yang lebih lama | Satu lookup kecil per request. Memberi "logout di semua perangkat" dan "password diganti" |
+    | **Opaque reference token** | Jangan pakai JWT: token berupa id acak yang di-lookup di setiap call | Kembali ke session Module 1, lengkap dengan semua sifatnya |
 
-    A reasonable default is the first two together, which is what the lab does. Add a deny list or a "valid after" check only where a five-minute window is too long, such as admin consoles or payments.
+    Default yang masuk akal adalah dua yang pertama digabung, dan itulah yang dilakukan lab. Tambahkan deny list atau pengecekan "valid after" hanya di tempat yang jendela lima menit terlalu panjang, seperti konsol admin atau pembayaran.
 
     <Callout type="warn">
-      Do not rely on the client. A request to delete the token from `localStorage` only helps an honest page. A copied token keeps working, so real revocation has to happen on the server.
+      Jangan mengandalkan client. Permintaan untuk menghapus token dari `localStorage` hanya membantu halaman yang jujur. Token yang sudah disalin tetap berfungsi, jadi revoke yang sebenarnya harus terjadi di server.
     </Callout>
 
     <Callout type="info">
-      Worth asking of your own system: when an account is disabled in **sso-backend**, how long can an already-issued token still be used on **core-api**? What bounds that, and is there any check in between?
+      Coba tanyakan ke sistem kamu sendiri: ketika akun dinonaktifkan di **sso-backend**, berapa lama token yang sudah diterbitkan masih bisa dipakai di **core-api**? Apa yang membatasinya, dan adakah pengecekan di antaranya?
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Log out and watch what stops working, and what does not.
+    Logout dan perhatikan apa yang berhenti berfungsi, dan apa yang tidak.
 
     <LabTasks />
 
     <LabConsole
       lab="02"
       actions={[
-        { label: "Log in", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
+        { label: "Login", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
         { label: "Profile", method: "GET", path: "/api/profile", headers: { Authorization: "Bearer {{accessToken}}" } },
-        { label: "Log out", method: "POST", path: "/refresh/logout" },
+        { label: "Logout", method: "POST", path: "/refresh/logout" },
         { label: "Refresh", method: "POST", path: "/refresh" },
       ]}
     />
 
-    1. Click **Log in**, then **Profile**: `200`.
-    2. Click **Log out**. The answer is `204 No Content` and a `Set-Cookie` that deletes `rt`. Logout is a `POST` to `/refresh/logout` because the refresh cookie is only sent to paths under `/refresh`.
-    3. Click **Refresh**. It returns `401`: the cookie is gone and the family is revoked.
-    4. Click **Profile** again. It still returns **`200`**. The console kept the access token from your login, and the API has no reason to doubt it until it expires. That is the gap from the table above, live.
+    1. Klik **Login**, lalu **Profile**: `200`.
+    2. Klik **Logout**. Jawabannya `204 No Content` dan satu `Set-Cookie` yang menghapus `rt`. Logout berupa `POST` ke `/refresh/logout` karena cookie refresh hanya dikirim ke path di bawah `/refresh`.
+    3. Klik **Refresh**. Hasilnya `401`: cookie sudah hilang dan family-nya di-revoke.
+    4. Klik **Profile** lagi. Hasilnya masih **`200`**. Console menyimpan access token dari login kamu, dan API nggak punya alasan meragukannya sampai expired. Itulah celah dari tabel di atas, secara live.
 
-    The browser deleted the cookie, so step 3 arrives without one. To see the **server-side** revocation of a token someone *copied*, use curl again (port `4102` for Go, `4202` for TypeScript):
+    Browser sudah menghapus cookie-nya, jadi langkah 3 tiba tanpa cookie. Untuk melihat revoke **di sisi server** atas token yang *disalin* seseorang, pakai curl lagi (port `4102` untuk Go, `4202` untuk TypeScript):
 
     ```bash
     LAB=http://localhost:4102
@@ -89,77 +89,77 @@ import { flows } from "@/content/flows";
     curl -s -o /dev/null -w 'refresh with the copied token: %{http_code}\n' -X POST $LAB/refresh -H "Cookie: rt=$RT"
     ```
 
-    The copy still has the right bytes, and it is refused: `204`, then `401`.
+    Salinannya masih punya byte yang benar, tapi ditolak: `204`, lalu `401`.
   </Step>
 
-  <Step id="code" title="Code">
-    Logout is small. It revokes the family of the presented token and clears the cookie. An unknown or missing token is a harmless no-op, so logging out twice is fine.
+  <Step id="code" title="Kode">
+    Logout itu kecil. Dia me-revoke family dari token yang disodorkan dan menghapus cookie. Token yang nggak dikenal atau tidak ada itu no-op yang tidak berbahaya, jadi logout dua kali pun aman.
 
     <CodeTabs
       go="labs/02-jwt/go/server.go#L227-L236"
       ts="labs/02-jwt/ts/src/app.ts#L148-L154"
       notes={{
-        229: "Revoke the family of the presented refresh token.",
-        234: "Delete the cookie in the browser as well.",
-        235: "204: nothing to return.",
-        151: "Revoke the family, if a cookie was sent.",
-        152: "Clear the cookie.",
+        229: "Revoke family dari refresh token yang disodorkan.",
+        234: "Hapus juga cookie di browser.",
+        235: "204: nggak ada yang dikembalikan.",
+        151: "Revoke family, kalau ada cookie yang dikirim.",
+        152: "Hapus cookie.",
         153: "204 No Content.",
       }}
     />
 
-    One statement does the revoking: every token of the family is marked, used or not.
+    Satu statement yang melakukan revoke: setiap token di family ditandai, baik sudah dipakai maupun belum.
 
     <CodeTabs
       go="labs/02-jwt/go/refresh.go#L99-L105"
       ts="labs/02-jwt/ts/src/refresh.ts#L57-L61"
       notes={{
-        102: "Set revoked_at on every live token of the family.",
-        103: "The family is found from the presented token's hash.",
-        59: "The same single UPDATE in TypeScript.",
-        60: "Family lookup by the hash of the presented token.",
+        102: "Set revoked_at pada setiap token yang masih hidup di family.",
+        103: "Family dicari dari hash token yang disodorkan.",
+        59: "UPDATE tunggal yang sama di TypeScript.",
+        60: "Lookup family lewat hash token yang disodorkan.",
       }}
     />
 
-    Compare it with the check that runs on every API call, in `verifyAccess`: it reads no table. That asymmetry is the whole lesson.
+    Bandingkan dengan pengecekan yang jalan di setiap API call, di `verifyAccess`: dia nggak membaca tabel apa pun. Asimetri itulah inti lesson ini.
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "A self-contained token cannot be revoked before exp: the API verifies it offline.",
-        "Logout revokes the refresh token family at once, but the access token lives until it expires.",
-        "Short access tokens put an upper bound on how long a revocation takes to be effective.",
-        "Immediate revocation needs state: a deny list, introspection, or a per-user valid-after timestamp.",
-        "Claims go stale too: a role change is not seen until the token is replaced.",
+        "Token self-contained nggak bisa di-revoke sebelum exp: API memverifikasinya secara offline.",
+        "Logout me-revoke refresh token family seketika, tapi access token hidup sampai expired.",
+        "Access token yang pendek memberi batas atas berapa lama revoke baru berlaku efektif.",
+        "Revoke seketika butuh state: deny list, introspection, atau timestamp valid-after per user.",
+        "Claims juga basi: perubahan role nggak terlihat sampai token diganti.",
       ]}
       interview={[
         {
-          q: "How do you log a user out when you use JWTs?",
-          a: "Revoke the refresh token on the server (and clear its cookie), and have the client drop the access token. The access token cannot be recalled, so it stays valid until it expires, which is why it is short-lived. If a sensitive API cannot wait, add a deny list of token ids or a per-user valid-after timestamp checked on each request.",
+          q: "Bagaimana cara logout user kalau kamu memakai JWT?",
+          a: "Revoke refresh token di server (dan hapus cookie-nya), lalu minta client membuang access token. Access token nggak bisa ditarik kembali, jadi tetap valid sampai expired, makanya umurnya pendek. Kalau API yang sensitif nggak bisa menunggu, tambahkan deny list berisi token id atau timestamp valid-after per user yang dicek di setiap request.",
         },
         {
-          q: "What is the trade-off of stateless tokens when it comes to revocation?",
-          a: "Verification needs no server state, which is the benefit, so there is nothing to delete either. Any scheme for immediate revocation adds a server-side check per request, so you are choosing between scalability and simplicity on one side and instant control on the other. Most systems take short lifetimes plus refresh revocation.",
+          q: "Apa trade-off token stateless soal revoke?",
+          a: "Verifikasi nggak butuh state di server, itulah keuntungannya, jadi nggak ada juga yang bisa dihapus. Skema revoke seketika apa pun menambahkan pengecekan di sisi server per request, jadi kamu memilih antara skalabilitas dan kesederhanaan di satu sisi, dan kontrol instan di sisi lain. Kebanyakan sistem memilih umur pendek plus revoke refresh token.",
         },
         {
-          q: "What is token introspection?",
-          a: "An endpoint, defined in RFC 7662, where an API sends a token to the authorization server and gets back whether it is active and its metadata. It gives you immediate revocation and fresh claims, at the cost of a network call per request and a dependency on the authorization server. Many systems cache the answer briefly.",
+          q: "Token introspection itu apa?",
+          a: "Endpoint, didefinisikan di RFC 7662, tempat API mengirim token ke authorization server dan mendapat jawaban apakah token itu aktif beserta metadata-nya. Dia memberi revoke seketika dan claims yang segar, dengan biaya satu network call per request dan ketergantungan pada authorization server. Banyak sistem meng-cache jawabannya sebentar.",
         },
         {
-          q: "A user's account is disabled. What happens to their existing tokens?",
-          a: "The refresh token family is revoked, so no new access tokens are issued. Any access token already issued keeps working until its exp, unless the API also checks a deny list or valid-after value. So the maximum delay is the access token lifetime.",
+          q: "Akun user dinonaktifkan. Apa yang terjadi pada token yang sudah ada?",
+          a: "Refresh token family di-revoke, jadi access token baru nggak diterbitkan lagi. Access token yang sudah terbit tetap berfungsi sampai exp-nya, kecuali API juga mengecek deny list atau nilai valid-after. Jadi keterlambatan maksimumnya adalah umur access token.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why logging out does not immediately stop an old access token, and what you would do if five minutes is too long."
+      prompt="Jelaskan ke teman satu tim kenapa logout nggak langsung menghentikan access token lama, dan apa yang akan kamu lakukan kalau lima menit terlalu lama."
       rubric={[
-        "APIs verify the signature and exp offline and never ask the server",
-        "Logout revokes only the refresh token, so no new access tokens are issued",
-        "The old access token keeps working until exp, which is why it is short",
-        "For immediate effect add a server-side check: a deny list, introspection or a valid-after timestamp",
+        "API memverifikasi signature dan exp secara offline dan nggak pernah bertanya ke server",
+        "Logout hanya me-revoke refresh token, jadi nggak ada access token baru yang diterbitkan",
+        "Access token lama tetap berfungsi sampai exp, makanya umurnya pendek",
+        "Untuk efek seketika, tambahkan pengecekan di sisi server: deny list, introspection, atau timestamp valid-after",
       ]}
     />
   </Step>

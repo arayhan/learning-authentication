@@ -53,21 +53,21 @@ export function PkceGenerator() {
         }).toString(),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setProbe({ state: "done", status: res.status, error: body.error ?? "(no error field)" });
+      setProbe({ state: "done", status: res.status, error: body.error ?? "(nggak ada field error)" });
     } catch {
       setProbe({ state: "offline" });
     }
   };
 
   const rows: [string, string, string | undefined][] = [
-    ["Verifier bytes (hex)", "The verifier is plain ASCII, so each character is one byte.", shown?.bytesHex],
-    ["SHA-256 digest (hex)", "32 bytes. A one-way function: the challenge does not reveal the verifier.", shown?.digestHex],
+    ["Verifier bytes (hex)", "Verifier-nya ASCII biasa, jadi satu karakter sama dengan satu byte.", shown?.bytesHex],
+    ["SHA-256 digest (hex)", "32 byte. Fungsi satu arah: challenge nggak membocorkan verifier.", shown?.digestHex],
   ];
 
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">PKCE S256 generator</h3>
+        <h3 className="text-sm font-semibold">Generator PKCE S256</h3>
         <LabSwitcher />
       </div>
 
@@ -82,12 +82,12 @@ export function PkceGenerator() {
           className="w-full rounded-md border bg-background p-2 font-mono text-xs break-all"
         />
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => setVerifier(randomVerifier())}>Generate a new one</Button>
-          <Button variant="outline" size="sm" onClick={() => setVerifier(RFC_VERIFIER)}>Use the RFC 7636 example</Button>
+          <Button variant="outline" size="sm" onClick={() => setVerifier(randomVerifier())}>Bikin yang baru</Button>
+          <Button variant="outline" size="sm" onClick={() => setVerifier(RFC_VERIFIER)}>Pakai contoh RFC 7636</Button>
         </div>
         {!valid && verifier !== "" && (
           <p role="alert" className="text-xs text-destructive">
-            A verifier is 43 to 128 characters from A-Z a-z 0-9 - . _ ~ (RFC 7636 section 4.1). This one has {verifier.length}.
+            Verifier harus 43 sampai 128 karakter dari A-Z a-z 0-9 - . _ ~ (RFC 7636 section 4.1). Yang ini {verifier.length} karakter.
           </p>
         )}
       </div>
@@ -102,28 +102,28 @@ export function PkceGenerator() {
             </li>
           ))}
           <li className="space-y-1">
-            <p className="font-medium">3. Base64url of the digest, no padding</p>
-            <p className="text-muted-foreground">43 characters. This is the code_challenge, the only part that travels in the browser URL.</p>
+            <p className="font-medium">3. Base64url dari digest, tanpa padding</p>
+            <p className="text-muted-foreground">43 karakter. Ini code_challenge, satu-satunya bagian yang lewat di URL browser.</p>
             <output aria-label="code_challenge" className="block rounded border border-brand/40 bg-muted/30 p-2 font-mono font-semibold break-all">{shown.challenge}</output>
           </li>
         </ol>
       )}
 
       <div className="space-y-2 border-t pt-3">
-        <p className="text-sm font-medium">Try a wrong verifier on the lab</p>
+        <p className="text-sm font-medium">Coba verifier yang salah di lab</p>
         <p className="text-xs text-muted-foreground">
-          Posts a freshly invented verifier (not the one above) to {labBase("03", impl)}/token. Paste a real authorization code to see the server reject a genuine code; leave it empty to send a made-up one.
+          Kirim verifier karangan baru (bukan yang di atas) ke {labBase("03", impl)}/token. Tempel authorization code asli biar kelihatan server menolak code yang asli; kosongkan kalau mau kirim code palsu.
         </p>
-        <label htmlFor="pkce-code" className="text-xs font-medium">Authorization code (optional)</label>
+        <label htmlFor="pkce-code" className="text-xs font-medium">Authorization code (opsional)</label>
         <input id="pkce-code" value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} className="w-full rounded-md border bg-background p-2 font-mono text-xs" />
-        <Button variant="outline" size="sm" disabled={probe.state === "busy"} onClick={() => void test()}>Test a wrong verifier</Button>
+        <Button variant="outline" size="sm" disabled={probe.state === "busy"} onClick={() => void test()}>Tes verifier yang salah</Button>
         {probe.state === "offline" && <OfflineCard lab="03" impl={impl} retrying={false} />}
         {probe.state === "done" && (
           <div aria-live="polite" className="space-y-1 rounded border bg-muted/30 p-2 text-xs">
             <p className="font-mono">POST /token → {probe.status} <span className="font-semibold">{probe.error}</span></p>
             {probe.error === "invalid_grant" && (
               <p>
-                The server answers invalid_grant for a wrong verifier, an unknown code, an expired code and a reused code alike, with no hint which. That is deliberate (RFC 6749 section 5.2): an attacker learns nothing from the difference.
+                Server menjawab invalid_grant untuk verifier yang salah, code yang nggak dikenal, code expired, maupun code yang dipakai ulang, tanpa petunjuk mana yang terjadi. Ini disengaja (RFC 6749 section 5.2): attacker nggak dapat info apa pun dari perbedaannya.
               </p>
             )}
           </div>

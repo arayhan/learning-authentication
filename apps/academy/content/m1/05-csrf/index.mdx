@@ -2,76 +2,76 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    You are signed in to your bank in one tab. In another tab you open a page that promises a free cruise. Nothing visibly happens, and your balance drops anyway.
+    Kamu lagi login ke m-banking di satu tab. Di tab lain kamu buka halaman yang menjanjikan hadiah umrah gratis. Kelihatannya tidak terjadi apa-apa, tapi saldo kamu tetap berkurang.
 
-    <Analogy title="The forged signature">
-      Someone slips a letter in front of your bank, written by them, carrying a signature that looks like yours. The bank sees a familiar signature and pays out. It never asks whether you actually wrote the letter.
+    <Analogy title="Tanda tangan palsu">
+      Ada orang menyelipkan surat ke teller bank, ditulis olehnya sendiri, dengan tanda tangan yang mirip punya kamu. Teller melihat tanda tangan yang familier lalu mencairkan dana. Ia tidak pernah bertanya apakah kamu sendiri yang menulis surat itu.
     </Analogy>
   </Step>
 
-  <Step id="attack" title="The attack">
-    **Cross-site request forgery (CSRF)** makes a victim's browser send a request they never intended, while it carries their cookie.
+  <Step id="attack" title="Serangannya">
+    **Cross-site request forgery (CSRF)** membuat browser korban mengirim request yang tidak pernah ia maksudkan, sambil membawa cookie-nya.
 
-    It works because of one browser habit: cookies are **ambient credentials**. The browser attaches the cookies for `bank.example` to every request going to `bank.example`, no matter which page caused the request. The bank cannot tell a click on its own page from a form hidden on another site.
+    Ini bisa terjadi karena satu kebiasaan browser: cookie adalah **ambient credentials**. Browser menempelkan cookie untuk `bank.example` ke setiap request yang menuju `bank.example`, apa pun halaman yang memicu request itu. Bank tidak bisa membedakan klik di halamannya sendiri dari form tersembunyi di situs lain.
 
     <SequenceFlow flow={flows.csrfAttack} />
 
-    Three ingredients are needed. Remove any one and the attack fails:
+    Dibutuhkan tiga bahan. Hilangkan satu saja dan serangan gagal:
 
-    1. The app authenticates with a **cookie** the browser sends by itself.
-    2. There is a **state-changing request** (transfer money, change email).
-    3. The attacker can **predict every parameter** of that request.
+    1. App melakukan authentication dengan **cookie** yang dikirim browser sendiri.
+    2. Ada **request yang mengubah state** (transfer uang, ganti email).
+    3. Attacker bisa **menebak semua parameter** request itu.
 
-    Note what the attacker does **not** get: the response. CSRF is blind. It can cause actions, not read data, which is why it targets state changes.
+    Perhatikan apa yang **tidak** didapat attacker: response-nya. CSRF itu buta. Ia bisa memicu aksi, tidak bisa membaca data, makanya targetnya perubahan state.
   </Step>
 
-  <Step id="defenses" title="Defenses">
-    Defenses stack, and each one blocks the attack at a different point.
+  <Step id="defenses" title="Pertahanan">
+    Pertahanan itu bertumpuk, dan masing-masing menghentikan serangan di titik yang berbeda.
 
-    | Defense | How it stops the forged request | Watch out for |
+    | Pertahanan | Cara menghentikan request palsu | Yang perlu diwaspadai |
     |---|---|---|
-    | `SameSite=Lax` cookie | The browser does not send the cookie on cross-site POSTs or subrequests | Subdomains count as the same site. Lax still sends cookies on cross-site top-level **GET** navigations, so never change state on GET. |
-    | **CSRF token** (synchronizer) | A per-session secret must come back in a header or field. Attackers cannot read it, so they cannot send it. | Must be unpredictable, tied to the session, and compared in constant time |
-    | **Origin check** | Reject unsafe requests whose `Origin` (or `Sec-Fetch-Site`) is not your own site | Do not rely on `Referer` alone. Be strict about which origins are allowed |
-    | Custom header + CORS | A JSON `fetch` with a custom header triggers a CORS preflight that other origins fail | A weak fallback. Do not rely on it as your only defense |
+    | Cookie `SameSite=Lax` | Browser tidak mengirim cookie di POST atau subrequest lintas situs | Subdomain dihitung sebagai situs yang sama. Lax tetap mengirim cookie di navigasi top-level **GET** lintas situs, jadi jangan pernah mengubah state lewat GET. |
+    | **CSRF token** (synchronizer) | Secret per session harus kembali lewat header atau field. Attacker tidak bisa membacanya, jadi tidak bisa mengirimnya. | Harus tidak bisa ditebak, terikat ke session, dan dibandingkan secara constant-time |
+    | **Origin check** | Tolak request tidak aman yang `Origin`-nya (atau `Sec-Fetch-Site`) bukan situs kamu sendiri | Jangan hanya bergantung pada `Referer`. Ketat soal origin mana yang diizinkan |
+    | Custom header + CORS | `fetch` JSON dengan custom header memicu CORS preflight yang gagal untuk origin lain | Fallback yang lemah. Jangan jadikan satu-satunya pertahanan |
 
-    One caveat on `SameSite`: modern Chrome treats a cookie with no `SameSite` attribute as `Lax` by default. In the simulator, "no SameSite" therefore models older browsers or an explicit `SameSite=None`.
+    Satu catatan soal `SameSite`: Chrome modern memperlakukan cookie tanpa atribut `SameSite` sebagai `Lax` secara default. Di simulator, "no SameSite" jadi memodelkan browser lama atau `SameSite=None` yang eksplisit.
 
-    The lab uses the **synchronizer token** pattern. Each session gets its own random CSRF token (you saw it in the `/login` response body). The browser's own JavaScript sends it back in an `X-CSRF-Token` header on every request that changes state, and the server compares it with the one stored for that session.
+    Lab ini memakai pola **synchronizer token**. Setiap session punya CSRF token acak sendiri (kamu sudah melihatnya di response body `/login`). JavaScript milik browser mengirimnya kembali di header `X-CSRF-Token` pada setiap request yang mengubah state, dan server membandingkannya dengan yang tersimpan untuk session itu.
 
     <Callout type="security">
-      **CORS is not a CSRF defense.** CORS decides who may *read* a cross-origin response. A cross-site form POST is a "simple request": it is still sent, with cookies, and the damage happens whether or not anyone reads the reply.
+      **CORS bukan pertahanan CSRF.** CORS menentukan siapa yang boleh *membaca* response lintas origin. POST form lintas situs adalah "simple request": ia tetap terkirim, lengkap dengan cookie, dan kerusakannya terjadi entah ada yang membaca balasannya atau tidak.
     </Callout>
 
     <Callout type="warn">
-      If your own subdomains are not all trusted, or an attacker can run script on one of them, `SameSite` will not separate them from your app: same registrable domain means same site. The token and Origin check carry the load. And an **XSS** bug on your own origin defeats every CSRF defense, because the attacker's script can read the token like any other script.
+      Kalau subdomain milikmu tidak semuanya dipercaya, atau attacker bisa menjalankan script di salah satunya, `SameSite` tidak akan memisahkan mereka dari app kamu: domain terdaftar yang sama berarti situs yang sama. Token dan Origin check yang memikul bebannya. Dan bug **XSS** di origin kamu sendiri menjebol semua pertahanan CSRF, karena script attacker bisa membaca token seperti script lain.
     </Callout>
 
     <Callout type="info">
-      Worth asking of your own setup: do **sso-frontend** and **sso-backend** live on sibling subdomains of one domain, and which cookies does the browser send between them? If so, `SameSite` alone does not isolate them from other things on that domain, so check that state-changing endpoints verify a token or `Origin`.
+      Coba tanyakan di setup kamu sendiri: apakah **sso-frontend** dan **sso-backend** ada di subdomain bersaudara dari satu domain, dan cookie apa yang dikirim browser di antara keduanya? Kalau iya, `SameSite` saja tidak memisahkan mereka dari hal lain di domain itu, jadi pastikan endpoint yang mengubah state memverifikasi token atau `Origin`.
     </Callout>
   </Step>
 
   <Step id="simulate" title="Simulator">
-    Run the attack yourself. The evil page on the left submits a hidden form to the bank on the right. Switch defenses on **one at a time** and send the forged request.
+    Jalankan serangannya sendiri. Halaman jahat di kiri men-submit form tersembunyi ke bank di kanan. Nyalakan pertahanan **satu per satu** dan kirim request palsunya.
 
-    1. Send it with every defense off: the transfer goes through.
-    2. Turn on **SameSite=Lax** alone and send again.
-    3. Repeat for **CSRF token** alone, then **Origin check** alone.
+    1. Kirim dengan semua pertahanan mati: transfer berhasil.
+    2. Nyalakan **SameSite=Lax** saja, lalu kirim lagi.
+    3. Ulangi untuk **CSRF token** saja, lalu **Origin check** saja.
 
     <CsrfSim />
 
-    This is a simulation, so nothing leaves the page. The next steps do the same thing for real against the lab.
+    Ini simulasi, jadi tidak ada yang keluar dari halaman. Langkah berikutnya melakukan hal yang sama secara nyata ke lab.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Two requests, one cookie, two different outcomes. Log in, then try the transfer without and with the CSRF token.
+    Dua request, satu cookie, dua hasil berbeda. Log in, lalu coba transfer tanpa dan dengan CSRF token.
 
     <LabTasks />
 
@@ -80,102 +80,102 @@ import { flows } from "@/content/flows";
       actions={[
         { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
         { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
-        { label: "Transfer, no token", method: "POST", path: "/transfer", body: { to: "bob@example.com", amount: 25 } },
-        { label: "Transfer, with token", method: "POST", path: "/transfer", headers: { "X-CSRF-Token": "{{csrfToken}}" }, body: { to: "bob@example.com", amount: 25 } },
+        { label: "Transfer, tanpa token", method: "POST", path: "/transfer", body: { to: "bob@example.com", amount: 25 } },
+        { label: "Transfer, dengan token", method: "POST", path: "/transfer", headers: { "X-CSRF-Token": "{{csrfToken}}" }, body: { to: "bob@example.com", amount: 25 } },
       ]}
     />
 
-    The first transfer carries your valid session cookie and still gets `403 {"error":"csrf"}`. That is what a forged request looks like to a protected server: right cookie, missing secret.
+    Transfer pertama membawa session cookie kamu yang valid dan tetap kena `403 {"error":"csrf"}`. Begitulah tampilan request palsu di mata server yang terlindungi: cookie benar, secret tidak ada.
 
-    The second one adds `X-CSRF-Token`, taken from the response to `/login`, and returns `200`. Only code running in the bank's own page could have known that value.
+    Yang kedua menambahkan `X-CSRF-Token`, diambil dari response `/login`, dan mengembalikan `200`. Hanya kode yang berjalan di halaman bank sendiri yang bisa tahu nilai itu.
 
     <Callout type="info">
-      A subtle point about the lab: `/transfer` only accepts `application/json`, and a cross-site HTML form cannot send that type. So a plain form attack would already fail on a parsing error. That is an accident of the API, not a defense to count on. Parsers get lenient and endpoints get added, so keep the token.
+      Satu hal halus soal lab ini: `/transfer` hanya menerima `application/json`, dan form HTML lintas situs tidak bisa mengirim tipe itu. Jadi serangan form biasa sebenarnya sudah gagal di parsing. Itu kebetulan dari API-nya, bukan pertahanan yang boleh diandalkan. Parser bisa jadi longgar dan endpoint baru bisa ditambahkan, jadi tetap pakai token.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    The transfer handler. It finds the session, then compares the header with the token stored for that session, before it reads the body.
+  <Step id="code" title="Kode">
+    Transfer handler. Ia mencari session, lalu membandingkan header dengan token yang tersimpan untuk session itu, sebelum membaca body.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L272-L292"
       ts="labs/01-sessions/ts/src/app.ts#L165-L177"
       notes={{
-        277: "The CSRF check. The vulnerable flag skips it, so we can show the attack succeeding.",
-        291: "A demo response: the lab keeps no balances.",
-        169: "The same check in TypeScript, with the same vulnerable escape hatch.",
+        277: "Pengecekan CSRF. Flag vulnerable melewatinya, supaya kita bisa menunjukkan serangan yang berhasil.",
+        291: "Response demo: lab tidak menyimpan saldo.",
+        169: "Pengecekan yang sama di TypeScript, dengan jalan keluar vulnerable yang sama.",
       }}
     />
 
-    The comparison is constant-time, so response timing cannot be used to guess the token byte by byte.
+    Perbandingannya constant-time, jadi waktu response tidak bisa dipakai untuk menebak token byte demi byte.
 
     <CodeTabs
       go="labs/01-sessions/go/session.go#L43"
       ts="labs/01-sessions/ts/src/session.ts#L16-L20"
       notes={{
-        19: "A length check first (lengths are not secret), then timingSafeEqual.",
+        19: "Cek panjang dulu (panjang bukan rahasia), baru timingSafeEqual.",
       }}
     />
   </Step>
 
-  <Step id="breakit" title="Break it">
-    Now play the attacker's side and see what happens when the check is gone. The button below sends `X-Lab-Mode: vulnerable`, which makes the lab skip the CSRF check. It is a stand-in for a server that forgot it.
+  <Step id="breakit" title="Coba bobol">
+    Sekarang main di sisi attacker dan lihat apa yang terjadi saat pengecekannya hilang. Tombol di bawah mengirim `X-Lab-Mode: vulnerable`, yang membuat lab melewati pengecekan CSRF. Ini pengganti server yang lupa membuatnya.
 
     <LabConsole
       lab="01"
       actions={[
         { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
         { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
-        { label: "Forged transfer, no token", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 }, vulnerable: true },
-        { label: "Transfer, no token (secure)", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 } },
+        { label: "Transfer palsu, tanpa token", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 }, vulnerable: true },
+        { label: "Transfer, tanpa token (aman)", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 } },
       ]}
     />
 
-    With the check skipped, the forged request returns `200`: the cookie alone was enough. Run the secure version of the same request and it returns `403`.
+    Dengan pengecekan dilewati, request palsu mengembalikan `200`: cookie saja sudah cukup. Jalankan versi aman dari request yang sama dan hasilnya `403`.
 
-    The point of the exercise: the **only** thing separating "attacker moves money" from "attacker is refused" is one server-side comparison.
+    Inti latihannya: satu-satunya pembeda antara "attacker memindahkan uang" dan "attacker ditolak" adalah satu perbandingan di sisi server.
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "CSRF abuses cookies being sent automatically: the victim's browser makes the request, with their cookie.",
-        "It needs cookie auth, a state-changing request and predictable parameters.",
-        "Defenses stack: SameSite=Lax, a per-session CSRF token, an Origin check.",
-        "CORS is not a CSRF defense, and never change state on GET.",
-        "XSS on your own origin defeats CSRF protection entirely.",
+        "CSRF menyalahgunakan cookie yang dikirim otomatis: browser korban yang membuat request, dengan cookie-nya.",
+        "Butuh cookie auth, request yang mengubah state, dan parameter yang bisa ditebak.",
+        "Pertahanan bertumpuk: SameSite=Lax, CSRF token per session, Origin check.",
+        "CORS bukan pertahanan CSRF, dan jangan pernah mengubah state lewat GET.",
+        "XSS di origin kamu sendiri menjebol proteksi CSRF sepenuhnya.",
       ]}
       interview={[
         {
-          q: "What is CSRF and why does it work?",
-          a: "An attacker's page makes the victim's browser send a request to a site where the victim is logged in. Browsers attach cookies for the target site automatically, so the request is authenticated even though the user never intended it.",
+          q: "Apa itu CSRF dan kenapa bisa berhasil?",
+          a: "Halaman milik attacker membuat browser korban mengirim request ke situs tempat korban sedang login. Browser menempelkan cookie untuk situs tujuan secara otomatis, jadi request itu terautentikasi walau user tidak pernah bermaksud mengirimnya.",
         },
         {
-          q: "How does a CSRF token stop the attack?",
-          a: "The server gives each session a secret value and requires it back on every state-changing request, in a header or field. A cross-site page can send the request but cannot read the token because of the same-origin policy, so the forged request is rejected.",
+          q: "Gimana CSRF token menghentikan serangan?",
+          a: "Server memberi tiap session sebuah nilai rahasia dan mewajibkannya kembali di setiap request yang mengubah state, lewat header atau field. Halaman lintas situs bisa mengirim request tapi tidak bisa membaca token karena same-origin policy, jadi request palsunya ditolak.",
         },
         {
           q: "SameSite=Lax versus Strict?",
-          a: "Lax withholds the cookie on cross-site subrequests and POSTs but still sends it on top-level GET navigations, such as clicking a link. Strict withholds it on every cross-site request, which breaks inbound links by making users look logged out.",
+          a: "Lax menahan cookie di subrequest dan POST lintas situs tapi tetap mengirimnya di navigasi GET top-level, seperti mengklik link. Strict menahannya di setiap request lintas situs, yang merusak link masuk karena user terlihat seperti belum login.",
         },
         {
-          q: "Does SameSite make CSRF tokens unnecessary?",
-          a: "No, treat it as defense in depth. It covers one browser behavior only: it does not separate subdomains, and older or unusual clients may not enforce it. Keep a token or an Origin check on state-changing endpoints.",
+          q: "Apakah SameSite membuat CSRF token tidak perlu?",
+          a: "Tidak, anggap sebagai defense in depth. Ia hanya mencakup satu perilaku browser: tidak memisahkan subdomain, dan client lama atau tidak lazim mungkin tidak menegakkannya. Tetap pasang token atau Origin check di endpoint yang mengubah state.",
         },
         {
-          q: "Does CORS protect against CSRF?",
-          a: "No. CORS restricts who can read cross-origin responses. Simple cross-site requests are still sent, with cookies.",
+          q: "Apakah CORS melindungi dari CSRF?",
+          a: "Tidak. CORS membatasi siapa yang bisa membaca response lintas origin. Simple request lintas situs tetap terkirim, dengan cookie.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why a request can be forged even though the attacker never learns the victim's cookie."
+      prompt="Jelaskan ke teman satu tim kenapa sebuah request bisa dipalsukan walaupun attacker tidak pernah tahu cookie korban."
       rubric={[
-        "The browser attaches cookies automatically based on the destination",
-        "The attacker only has to make the victim's browser send the request",
-        "A per-session token is unreadable to the attacker, so the forged request lacks it",
-        "SameSite and an Origin check block it at other points",
+        "Browser menempelkan cookie secara otomatis berdasarkan tujuan request",
+        "Attacker hanya perlu membuat browser korban mengirim request itu",
+        "Token per session tidak bisa dibaca attacker, jadi request palsunya tidak membawanya",
+        "SameSite dan Origin check menghentikannya di titik lain",
       ]}
     />
   </Step>

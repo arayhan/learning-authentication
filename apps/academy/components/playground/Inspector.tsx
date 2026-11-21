@@ -35,7 +35,7 @@ export function Inspector({ lab }: { lab: LabId }) {
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span aria-hidden className={cn("size-2 rounded-full", status === "online" ? "bg-success" : "bg-muted-foreground/50")} />
-            {status === "online" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}
+            {status === "online" ? "Live" : status === "connecting" ? "Menyambung" : "Offline"}
           </span>
           <Button
             variant="ghost"
@@ -46,7 +46,7 @@ export function Inspector({ lab }: { lab: LabId }) {
               setSelectedId(null);
             }}
           >
-            <Trash2 /> Clear
+            <Trash2 /> Hapus
           </Button>
         </div>
       </div>
@@ -54,9 +54,9 @@ export function Inspector({ lab }: { lab: LabId }) {
       {status === "offline" && <OfflineCard lab={lab} impl={impl} />}
 
       {rows.length === 0 ? (
-        status !== "offline" && <p className="text-xs text-muted-foreground">No requests yet. Use the lab and they show up here.</p>
+        status !== "offline" && <p className="text-xs text-muted-foreground">Belum ada request. Coba pakai lab-nya, nanti muncul di sini.</p>
       ) : (
-        <ul aria-label="Requests" className="max-h-72 divide-y overflow-y-auto rounded-md border font-mono text-xs">
+        <ul aria-label="Daftar request" className="max-h-72 divide-y overflow-y-auto rounded-md border font-mono text-xs">
           {rows.map((e) => (
             <li key={e.id}>
               <button

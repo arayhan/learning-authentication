@@ -34,7 +34,7 @@ function Arrow({ step, index, x1, x2, y, isCurrent, animate, onOpen }: { step: F
     <g
       data-step={index}
       aria-current={isCurrent ? "step" : undefined}
-      aria-label={`${index + 1}. ${step.label}${interactive ? ". Show raw message" : ""}`}
+      aria-label={`${index + 1}. ${step.label}${interactive ? ". Lihat raw message" : ""}`}
       role={interactive ? "button" : "img"}
       tabIndex={interactive ? 0 : undefined}
       className={interactive ? "cursor-pointer outline-none [&:focus-visible_rect]:stroke-ring" : undefined}
@@ -97,7 +97,7 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
   const width = flow.actors.length * COL;
   const height = HEADER + (flow.steps.length + 0.5) * ROW;
   const cur = flow.steps[step];
-  if (!cur) return <p className="max-w-3xl rounded-lg border bg-card p-3 text-sm text-muted-foreground">No steps in this flow.</p>;
+  if (!cur) return <p className="max-w-3xl rounded-lg border bg-card p-3 text-sm text-muted-foreground">Flow ini belum punya langkah.</p>;
   const opened = open === null ? null : flow.steps[open];
 
   return (
@@ -145,20 +145,20 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
           </svg>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="icon-sm" aria-label="Back" disabled={step === 0} onClick={() => go(step - 1)}>
+          <Button variant="outline" size="icon-sm" aria-label="Mundur" disabled={step === 0} onClick={() => go(step - 1)}>
             <ChevronLeft />
           </Button>
-          <Button variant="outline" size="icon-sm" aria-label="Next" disabled={step === last} onClick={() => go(step + 1)}>
+          <Button variant="outline" size="icon-sm" aria-label="Maju" disabled={step === last} onClick={() => go(step + 1)}>
             <ChevronRight />
           </Button>
-          <Button variant="outline" size="icon-sm" aria-label={playing ? "Pause" : "Play"} disabled={last < 1} onClick={play}>
+          <Button variant="outline" size="icon-sm" aria-label={playing ? "Jeda" : "Putar"} disabled={last < 1} onClick={play}>
             {playing ? <Pause /> : <Play />}
           </Button>
           <Button variant="outline" size="icon-sm" aria-label="Reset" onClick={() => go(0)}>
             <RotateCcw />
           </Button>
           <span aria-live="polite" className="ml-1 text-sm text-muted-foreground tabular-nums">
-            Step {step + 1} of {flow.steps.length}
+            Langkah {step + 1} dari {flow.steps.length}
           </span>
         </div>
         <p className={`min-h-6 text-sm ${cur.danger ? "text-destructive" : ""}`}>{cur.note}</p>

@@ -20,15 +20,15 @@ export function OfflineCard({ lab, impl, retrying = true }: { lab: LabId; impl: 
   return (
     <div role="status" className="space-y-3 rounded-lg border bg-muted/30 p-4 text-sm">
       <p className="font-medium">
-        Lab {lab} ({impl === "go" ? "Go" : "TS"}) is not running
+        Lab {lab} ({impl === "go" ? "Go" : "TS"}) belum jalan
       </p>
       <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 font-mono text-xs">
         <code className="min-w-0 flex-1 truncate">{cmd}</code>
-        <Button variant="ghost" size="icon-xs" onClick={copy} aria-label={`Copy ${cmd}`}>
+        <Button variant="ghost" size="icon-xs" onClick={copy} aria-label={`Salin ${cmd}`}>
           {copied ? <Check /> : <Copy />}
         </Button>
       </div>
-      {retrying && <p className="text-xs text-muted-foreground">Retrying…</p>}
+      {retrying && <p className="text-xs text-muted-foreground">Nyoba nyambung lagi…</p>}
     </div>
   );
 }

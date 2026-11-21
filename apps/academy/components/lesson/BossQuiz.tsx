@@ -68,7 +68,7 @@ export function BossQuiz({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-armed on every answer so a timeout submits the latest ones
   }, [phase, answers, started, seconds]);
 
-  if (isDone(ref)) return <p className="rounded-lg border bg-muted/40 p-4 text-sm font-medium">Boss defeated.</p>;
+  if (isDone(ref)) return <p className="rounded-lg border bg-muted/40 p-4 text-sm font-medium">Boss kalah. Mantap!</p>;
 
   const start = () => {
     setOrders(quiz.questions.map((q) => shuffled(q.choices.length)));
@@ -88,15 +88,15 @@ export function BossQuiz({ id }: { id: string }) {
       {phase === "idle" && (
         <div className="space-y-3">
           <p className="text-sm">
-            {total} questions, {clock(seconds * 1000)} on the clock, {Math.round(passRatio * 100)}% to pass. No hints until you finish.
+            {total} pertanyaan, waktu {clock(seconds * 1000)}, lulus kalau minimal {Math.round(passRatio * 100)}%. Nggak ada hint sampai kamu selesai.
           </p>
-          <Button onClick={start}>Start boss</Button>
+          <Button onClick={start}>Mulai boss</Button>
         </div>
       )}
       {phase === "running" && (
         <>
           <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <span>Question {qi + 1} of {total}</span>
+            <span>Pertanyaan {qi + 1} dari {total}</span>
             <span role="timer" className="font-mono tabular-nums">{clock(left)}</span>
           </div>
           <p className="font-medium">{q.prompt}</p>
@@ -112,30 +112,30 @@ export function BossQuiz({ id }: { id: string }) {
             ))}
           </div>
           <Button disabled={answers[qi] < 0} onClick={() => (qi === total - 1 ? submit(answers) : setQi(qi + 1))}>
-            {qi === total - 1 ? "Finish" : "Next"}
+            {qi === total - 1 ? "Selesai" : "Berikutnya"}
           </Button>
         </>
       )}
       {phase === "submitting" && (
         <div className="space-y-3">
           <p role="status" className="text-sm text-muted-foreground">
-            {awaitingLogin ? "Sign in again to submit your answers." : "Grading…"}
+            {awaitingLogin ? "Login lagi dulu buat kirim jawabanmu." : "Lagi dinilai…"}
           </p>
-          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Sign in again</Button>}
+          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Login lagi</Button>}
         </div>
       )}
       {phase === "failed" && (
         <div className="space-y-3">
           <p role="alert" className="text-sm font-medium">
-            {score ? `You scored ${score.score} of ${score.total}.` : "Not passed."} Beat {Math.round(passRatio * 100)}% inside the time limit.
+            {score ? `Skor kamu ${score.score} dari ${score.total}.` : "Belum lulus."} Capai {Math.round(passRatio * 100)}% sebelum waktu habis.
           </p>
-          <Button variant="outline" onClick={start}>Try again</Button>
+          <Button variant="outline" onClick={start}>Coba lagi</Button>
         </div>
       )}
       {phase === "error" && (
         <div className="space-y-3">
-          <p role="alert" className="text-sm text-destructive">Could not submit your answers.</p>
-          <Button variant="outline" onClick={() => submit(answers)}>Retry</Button>
+          <p role="alert" className="text-sm text-destructive">Jawabanmu gagal dikirim.</p>
+          <Button variant="outline" onClick={() => submit(answers)}>Coba lagi</Button>
         </div>
       )}
     </div>

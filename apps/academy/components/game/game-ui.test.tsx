@@ -64,8 +64,8 @@ describe("BadgeShelf", () => {
   it("shows all 6 badges with the earned count", () => {
     render(<BadgeShelf earned={["cookie-monster", "flawless"]} />);
     expect(screen.getAllByRole("listitem")).toHaveLength(6);
-    expect(screen.getByText("2 / 6 earned")).toBeInTheDocument();
-    expect(screen.getByText("Finish Module 2")).toBeInTheDocument();
+    expect(screen.getByText("2 / 6 didapat")).toBeInTheDocument();
+    expect(screen.getByText("Selesaikan Module 2")).toBeInTheDocument();
   });
 });
 
@@ -134,7 +134,7 @@ describe("useProgress", () => {
       await screen.findByRole("dialog");
       await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
       await userEvent.type(screen.getByLabelText("Password"), "password123");
-      await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+      await userEvent.click(screen.getByRole("button", { name: "Login" }));
     };
 
     it("posts credentials, closes, bumps reauthCount and keeps page state without navigating", async () => {

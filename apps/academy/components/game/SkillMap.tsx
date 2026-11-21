@@ -4,13 +4,13 @@ import { course } from "@/lib/course/registry";
 import { lessonStates, lessonUrl } from "./skill-state";
 
 const ICON = { done: Check, available: Circle, locked: Lock } as const;
-const LABEL = { done: "Done", available: "Available", locked: "Locked" } as const;
+const LABEL = { done: "Selesai", available: "Tersedia", locked: "Terkunci" } as const;
 
 export function SkillMap({ completed }: { completed: readonly string[] }) {
   const states = lessonStates(completed);
   return (
     <section aria-labelledby="map-h" className="space-y-6">
-      <h2 id="map-h" className="text-sm font-medium">Skill map</h2>
+      <h2 id="map-h" className="text-sm font-medium">Peta skill</h2>
       {course.map((m) => {
         const doneCount = m.lessons.filter((l) => states.get(l.id) === "done").length;
         return (

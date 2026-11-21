@@ -63,7 +63,7 @@ function Headers({ title, headers }: { title: string; headers: Record<string, st
   return (
     <section className="space-y-1">
       <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-      {rows.length ? <pre className={mono}>{rows.join("\n")}</pre> : <p className="text-xs text-muted-foreground">None</p>}
+      {rows.length ? <pre className={mono}>{rows.join("\n")}</pre> : <p className="text-xs text-muted-foreground">Kosong</p>}
     </section>
   );
 }
@@ -72,16 +72,16 @@ function Body({ title, body }: { title: string; body?: string }) {
   return (
     <section className="space-y-1">
       <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-      {body ? <pre className={mono}>{pretty(body)}</pre> : <p className="text-xs text-muted-foreground">Empty</p>}
+      {body ? <pre className={mono}>{pretty(body)}</pre> : <p className="text-xs text-muted-foreground">Kosong</p>}
     </section>
   );
 }
 
-const flag = (b: boolean) => (b ? "Yes" : "-");
+const flag = (b: boolean) => (b ? "Ya" : "-");
 
 function Cookies({ event }: { event: TraceEvent }) {
   const cookies = setCookies(event).map(parseSetCookie);
-  if (!cookies.length) return <p className="text-xs text-muted-foreground">No Set-Cookie headers in this response.</p>;
+  if (!cookies.length) return <p className="text-xs text-muted-foreground">Nggak ada header Set-Cookie di response ini.</p>;
   const th = "px-2 py-1 font-medium whitespace-nowrap";
   const td = "px-2 py-1 align-top font-mono break-all";
   return (

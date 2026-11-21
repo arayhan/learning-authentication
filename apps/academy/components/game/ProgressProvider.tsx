@@ -78,7 +78,7 @@ export function ProgressProvider({ initial, children }: { initial: ProgressState
     if (gained > 0) toast(`+${gained} XP`);
     for (const id of newBadges) {
       const b = BADGES.find((x) => x.id === id);
-      if (b) toast(`Badge earned: ${b.title}`, { description: b.hint });
+      if (b) toast(`Badge didapat: ${b.title}`, { description: b.hint });
     }
     return result;
   }, []);

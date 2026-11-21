@@ -49,7 +49,7 @@ export async function CodeTabs({ go, ts, notes = {} }: { go?: string; ts?: strin
                   {p.lines.map(([l, text], i) => (
                     <li key={l} className="flex gap-2">
                       <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-primary-foreground">{i + 1}</span>
-                      <span><span className="font-mono text-xs text-muted-foreground">line {l}</span> {text}</span>
+                      <span><span className="font-mono text-xs text-muted-foreground">baris {l}</span> {text}</span>
                     </li>
                   ))}
                 </ol>
@@ -57,7 +57,7 @@ export async function CodeTabs({ go, ts, notes = {} }: { go?: string; ts?: strin
             </>
           ) : (
             <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-              Source not available yet: <span className="font-mono">{p.snip.path}</span>
+              Source belum tersedia: <span className="font-mono">{p.snip.path}</span>
             </p>
           )}
         </TabsContent>

@@ -25,9 +25,9 @@ describe("SequenceFlow", () => {
   it("Next advances the aria-current step", async () => {
     const { container } = render(<SequenceFlow flow={flow} />);
     expect(current(container)).toBe("0");
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /maju/i }));
     expect(current(container)).toBe("1");
-    expect(screen.getByText(/step 2 of 5/i)).toBeInTheDocument();
+    expect(screen.getByText(/langkah 2 dari 5/i)).toBeInTheDocument();
   });
 
   it("ArrowRight / ArrowLeft move the step when the region is focused", () => {
@@ -41,14 +41,14 @@ describe("SequenceFlow", () => {
 
   it("Back is disabled at step 0", () => {
     render(<SequenceFlow flow={flow} />);
-    expect(screen.getByRole("button", { name: /back/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /mundur/i })).toBeDisabled();
   });
 
   it("future steps are hidden and the note shows below", async () => {
     const { container } = render(<SequenceFlow flow={flow} />);
     expect(container.querySelectorAll("[data-step]")).toHaveLength(1);
     expect(screen.getByText(flow.steps[0].note!)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /maju/i }));
     expect(container.querySelectorAll("[data-step]")).toHaveLength(2);
   });
 
@@ -61,7 +61,7 @@ describe("SequenceFlow", () => {
     cleanup();
 
     const r = render(<SequenceFlow flow={flow} />);
-    await userEvent.click(within(r.container).getByRole("button", { name: /next/i }));
+    await userEvent.click(within(r.container).getByRole("button", { name: /maju/i }));
     expect(within(r.container).queryByRole("button", { name: /SELECT user/ })).toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe("SequenceFlow", () => {
 
   it("animates the newly drawn arrow when motion is allowed", async () => {
     const { container } = render(<SequenceFlow flow={flow} />);
-    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: /maju/i }));
     expect(hidden(container.querySelector('[data-step="1"]')!.parentElement!)).toBe(true);
   });
 
@@ -86,16 +86,16 @@ describe("SequenceFlow", () => {
     vi.useFakeTimers();
     motionPref.reduced = true;
     const { container } = render(<SequenceFlow flow={flow} />);
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(screen.getByRole("button", { name: /maju/i }));
     expect(hidden(container)).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: /reset/i }));
-    fireEvent.click(screen.getByRole("button", { name: /play/i }));
+    fireEvent.click(screen.getByRole("button", { name: /putar/i }));
     act(() => void vi.advanceTimersByTime(1600));
     expect(current(container)).toBe("1");
     for (let i = 0; i < 6; i++) act(() => void vi.advanceTimersByTime(1600)); // each tick re-arms after render
     expect(current(container)).toBe("4");
     expect(hidden(container)).toBe(false);
-    expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /putar/i })).toBeInTheDocument();
   });
 
   it("server render (and so the hydration render) has no hidden initial state", () => {
@@ -108,14 +108,14 @@ describe("SequenceFlow", () => {
     vi.useFakeTimers();
     const one = { ...flow, steps: flow.steps.slice(0, 1) };
     render(<SequenceFlow flow={one} />);
-    fireEvent.click(screen.getByRole("button", { name: /play/i }));
+    fireEvent.click(screen.getByRole("button", { name: /putar/i }));
     act(() => void vi.advanceTimersByTime(5000));
-    expect(screen.getByText(/step 1 of 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/langkah 1 dari 1/i)).toBeInTheDocument();
   });
 
   it("an empty flow renders a fallback without throwing", () => {
     render(<SequenceFlow flow={{ ...flow, steps: [] }} />);
-    expect(screen.getByText(/no steps/i)).toBeInTheDocument();
+    expect(screen.getByText(/belum punya langkah/i)).toBeInTheDocument();
   });
 
   it("modified arrow keys are ignored", () => {
@@ -127,8 +127,8 @@ describe("SequenceFlow", () => {
   it("pressing Next pauses Play; Reset returns to step 0", () => {
     vi.useFakeTimers();
     const { container } = render(<SequenceFlow flow={flow} />);
-    fireEvent.click(screen.getByRole("button", { name: /play/i }));
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(screen.getByRole("button", { name: /putar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /maju/i }));
     act(() => void vi.advanceTimersByTime(5000));
     expect(current(container)).toBe("1");
     fireEvent.click(screen.getByRole("button", { name: /reset/i }));

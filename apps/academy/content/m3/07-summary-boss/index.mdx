@@ -1,24 +1,24 @@
 <LessonSteps>
   <Step id="intro" title="Intro">
-    Ten questions from the whole module, ten minutes, and you need **8 correct** to pass. There is no feedback until the end, and choices are shuffled each attempt. You can retry as often as you like.
+    Sepuluh pertanyaan dari seluruh modul, sepuluh menit, dan kamu butuh **8 benar** untuk lulus. Nggak ada feedback sampai akhir, dan urutan pilihan diacak tiap percobaan. Kamu boleh mengulang sesering yang kamu mau.
 
-    Skim the checklist first. It doubles as an OAuth 2.1 and Security BCP (RFC 9700) review list for a real system.
+    Skim checklist-nya dulu. Dia juga bisa dipakai sebagai daftar review OAuth 2.1 dan Security BCP (RFC 9700) untuk sistem nyata.
 
-    | Topic | One line to remember |
+    | Topik | Satu baris untuk diingat |
     |---|---|
-    | Why OAuth | Delegated authorization: a scoped, expiring, revocable token instead of a shared password. Not authentication. |
-    | Roles | Resource owner, client, authorization server, resource server (RFC 6749). |
-    | Code flow | Front channel carries a one-time **code**. The token comes back on the back channel. |
-    | Client types | Public clients cannot keep a secret (SPA, mobile). Confidential ones can. |
-    | PKCE | `code_challenge = BASE64URL(SHA-256(verifier))`, S256 only. OAuth 2.1 requires it for the code flow. |
-    | Implicit and password grants | Gone in OAuth 2.1. Do not build on them. |
-    | `state` | Unguessable, bound to the browser session, checked on every callback. |
-    | `redirect_uri` | Registered ahead, compared by **exact string**. Bad value: error page, never a redirect. |
-    | Scopes | Enforced by the resource server on each request. `403 insufficient_scope` for a valid token that lacks one. |
-    | Codes | Short-lived, single-use, bound to client and redirect URI. Reuse means revoke. |
-    | Client credentials | Server to server, the client's own secret, no user, no refresh token. |
-    | Native apps | System browser, code flow and PKCE, never an embedded web view (RFC 8252). |
-    | Token responses | `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 section 5.1). |
+    | Kenapa OAuth | Delegated authorization: token yang scoped, kedaluwarsa, dan revocable sebagai ganti shared password. Bukan authentication. |
+    | Role | Resource owner, client, authorization server, resource server (RFC 6749). |
+    | Code flow | Front channel membawa **code** sekali pakai. Token kembali lewat back channel. |
+    | Tipe client | Public client nggak bisa menyimpan secret (SPA, mobile). Confidential bisa. |
+    | PKCE | `code_challenge = BASE64URL(SHA-256(verifier))`, hanya S256. OAuth 2.1 mewajibkannya untuk code flow. |
+    | Implicit dan password grant | Sudah hilang di OAuth 2.1. Jangan dibangun di atasnya. |
+    | `state` | Nggak bisa ditebak, terikat ke session browser, dicek di setiap callback. |
+    | `redirect_uri` | Didaftarkan di awal, dibandingkan dengan **exact string**. Nilai salah: halaman error, tidak pernah redirect. |
+    | Scope | Ditegakkan resource server di setiap request. `403 insufficient_scope` untuk token valid yang kekurangan scope. |
+    | Code | Umur pendek, sekali pakai, terikat ke client dan redirect URI. Dipakai ulang berarti cabut. |
+    | Client credentials | Server ke server, secret milik client sendiri, tanpa user, tanpa refresh token. |
+    | Native app | System browser, code flow dan PKCE, jangan pernah embedded web view (RFC 8252). |
+    | Token response | `Cache-Control: no-store` dan `Pragma: no-cache` (RFC 6749 section 5.1). |
 
     <BossQuiz id="boss" />
   </Step>

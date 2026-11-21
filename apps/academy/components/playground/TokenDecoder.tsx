@@ -59,7 +59,7 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold">Token decoder</h3>
-        <p className="text-xs text-muted-foreground">Paste any JWT. Decoding happens in your browser and sends nothing anywhere.</p>
+        <p className="text-xs text-muted-foreground">Tempel JWT apa saja. Decoding terjadi di browser kamu dan nggak ngirim apa pun ke mana-mana.</p>
       </div>
 
       <label className="block space-y-1.5 text-sm">
@@ -85,17 +85,17 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
 
       {decoded?.ok && (
         <>
-          <p role="group" aria-label="Colour-coded token" className="rounded-md border bg-muted/30 p-3 font-mono text-xs leading-5 break-all">
+          <p role="group" aria-label="Token berwarna" className="rounded-md border bg-muted/30 p-3 font-mono text-xs leading-5 break-all">
             <span className="text-brand">{decoded.parts[0]}</span>
             <span className="text-muted-foreground">.</span>
             <span className="font-semibold text-foreground">{decoded.parts[1]}</span>
             <span className="text-muted-foreground">.</span>
-            <span className="text-muted-foreground underline decoration-dotted underline-offset-2">{decoded.parts[2] || "(empty signature)"}</span>
+            <span className="text-muted-foreground underline decoration-dotted underline-offset-2">{decoded.parts[2] || "(signature kosong)"}</span>
           </p>
 
           {String(decoded.header.alg).toLowerCase() === "none" && (
             <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
-              The header says alg is &quot;none&quot;: this token is unsigned. A real verifier rejects it.
+              Header-nya bilang alg adalah &quot;none&quot;: token ini nggak ditandatangani. Verifier yang bener pasti nolak.
             </p>
           )}
 
@@ -110,8 +110,8 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
             </section>
             <section aria-label="Signature" className="min-w-0 space-y-1.5 rounded-md border border-dashed border-muted-foreground/50 p-3">
               <h4 className="text-xs font-semibold text-muted-foreground">Signature</h4>
-              <p className="font-mono text-xs break-all">{decoded.parts[2] || "(empty)"}</p>
-              <p className="text-xs text-muted-foreground">Decoding does not check it. Only verification does.</p>
+              <p className="font-mono text-xs break-all">{decoded.parts[2] || "(kosong)"}</p>
+              <p className="text-xs text-muted-foreground">Decoding nggak ngecek ini. Cuma verifikasi yang ngecek.</p>
             </section>
           </div>
 
@@ -134,21 +134,21 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
           <div className="space-y-2 border-t pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Button variant="outline" size="sm" disabled={check.state === "busy"} onClick={() => void verify()}>
-                Verify with lab JWKS
+                Verify pakai JWKS lab
               </Button>
               <LabSwitcher />
             </div>
             <p className="text-xs text-muted-foreground">
-              Fetches {labBase("02", impl)}/.well-known/jwks.json and checks the signature with RS256 pinned, issuer {ISSUER} and audience {AUDIENCE}.
+              Ambil {labBase("02", impl)}/.well-known/jwks.json lalu cek signature dengan RS256 dikunci, issuer {ISSUER} dan audience {AUDIENCE}.
             </p>
             {check.state === "valid" && (
               <p role="status" className="text-sm font-medium text-success">
-                Signature valid (RS256, kid {check.kid}). Issuer, audience and expiry also passed.
+                Signature valid (RS256, kid {check.kid}). Issuer, audience, dan expiry juga lolos.
               </p>
             )}
             {check.state === "failed" && (
               <p role="status" className="text-sm text-destructive">
-                Verification failed: {check.message}
+                Verifikasi gagal: {check.message}
               </p>
             )}
             {check.state === "offline" && <OfflineCard lab="02" impl={impl} retrying={false} />}

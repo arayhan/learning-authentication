@@ -5,6 +5,8 @@ import { course } from "@/lib/course/registry";
 import { useProgress } from "@/components/game/ProgressProvider";
 import { lessonStates, lessonUrl } from "@/components/game/skill-state";
 
+const STATE_LABEL = { done: "selesai", available: "tersedia", locked: "terkunci" } as const;
+
 export function ModuleNav() {
   const states = lessonStates(useProgress().state.completed);
   return (
@@ -20,7 +22,7 @@ export function ModuleNav() {
                 <>
                   <span className="w-4 font-mono text-xs tabular-nums text-muted-foreground">{i + 1}</span>
                   <span className="min-w-0 flex-1 truncate">{l.title}</span>
-                  <span className="sr-only">{s}</span>
+                  <span className="sr-only">{STATE_LABEL[s]}</span>
                   {s === "done" && <span aria-hidden className="size-1.5 rounded-full bg-brand" />}
                 </>
               );

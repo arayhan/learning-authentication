@@ -13,7 +13,7 @@ const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subset
 
 export const metadata: Metadata = {
   title: "Auth Academy",
-  description: "Learn authentication by building and breaking it.",
+  description: "Belajar authentication dengan cara bikin dan bobol sendiri.",
 };
 
 // Runs before paint so the saved (or system) theme applies without a flash.
@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const initial = user ? await getProgress(user.id, "UTC") : null;
   return (
     <html
-      lang="en"
+      lang="id"
       suppressHydrationWarning
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >

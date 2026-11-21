@@ -7,7 +7,7 @@ import { useLabImpl } from "./LabImpl";
 export function LabSwitcher() {
   const [impl, setImpl] = useLabImpl();
   return (
-    <div role="radiogroup" aria-label="Lab implementation" className="inline-flex rounded-md border p-0.5 text-xs">
+    <div role="radiogroup" aria-label="Implementasi lab" className="inline-flex rounded-md border p-0.5 text-xs">
       {(["go", "ts"] as const).map((i) => (
         <button
           key={i}

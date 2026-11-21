@@ -2,90 +2,90 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    PKCE protects the code. Three smaller parameters decide how much damage anyone can do when something else goes wrong: **`scope`** limits what a token can do, **`state`** ties the response to the request, and **`redirect_uri`** decides who receives the code at all.
+    PKCE melindungi code. Tiga parameter yang lebih kecil menentukan seberapa besar kerusakan yang bisa terjadi kalau ada hal lain yang salah: **`scope`** membatasi apa yang bisa dilakukan token, **`state`** mengikat response ke request, dan **`redirect_uri`** menentukan siapa yang menerima code.
 
-    Each one is a single line in a request, and each one is skipped or loosened in real systems because "it works without it".
+    Masing-masing cuma satu baris di request, dan masing-masing sering dilewati atau dilonggarkan di sistem nyata karena "toh jalan tanpa itu".
 
-    <Analogy title="The return address">
-      A registered letter is only delivered to the address on file, and a "close enough" address gets it sent back. A redirect URI has to match the registered one to the character, because a near miss could be a mailbox the attacker owns.
+    <Analogy title="Alamat paket">
+      Paket dari kurir hanya diantar ke alamat yang terdaftar, dan alamat yang "mirip-mirip" dikembalikan ke pengirim. Redirect URI harus sama persis dengan yang terdaftar sampai ke karakter terakhir, karena yang cuma mirip bisa jadi kotak surat milik attacker.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Scopes">
-    A **scope** is a name for a unit of access. The client asks for scopes, the user approves them on the consent page, the token carries them, and the **resource server** enforces them. A scope that nobody checks is decoration.
+  <Step id="concept" title="Scope">
+    **Scope** adalah nama untuk satu unit akses. Client meminta scope, user menyetujuinya di halaman consent, token membawanya, dan **resource server** menegakkannya. Scope yang nggak dicek siapa pun cuma hiasan.
 
     ```text
     scope=photos.read profile
     ```
 
-    Scopes are space-separated (RFC 6749 section 3.3), so in a URL they are written with `%20`: `scope=photos.read%20profile`. The URL builder below encodes it that way.
+    Scope dipisah spasi (RFC 6749 section 3.3), jadi di URL ditulis dengan `%20`: `scope=photos.read%20profile`. URL builder di bawah meng-encode-nya begitu.
 
-    | Where | What happens to the scope |
+    | Di mana | Apa yang terjadi pada scope |
     |---|---|
-    | `/authorize` | Must be a subset of what this client may ever get. `demo-spa` can ask for `photos.read` and `profile`. Anything else gives `error=invalid_scope` |
-    | Consent page | The user sees the scopes in plain language and approves or denies |
-    | Token | The granted scope goes in the `scope` claim of the JWT and in the token response |
-    | Resource server | The API reads the claim on every request and refuses what it does not cover |
+    | `/authorize` | Harus subset dari yang boleh didapat client ini. `demo-spa` bisa meminta `photos.read` dan `profile`. Selain itu menghasilkan `error=invalid_scope` |
+    | Halaman consent | User melihat scope dalam bahasa biasa lalu menyetujui atau menolak |
+    | Token | Scope yang diberikan masuk ke claim `scope` di JWT dan ke token response |
+    | Resource server | API membaca claim itu di setiap request dan menolak yang nggak tercakup |
 
-    Two different failures are easy to confuse. The API answers per RFC 6750 section 3.1:
+    Dua kegagalan yang berbeda gampang tertukar. API menjawab sesuai RFC 6750 section 3.1:
 
-    - `401` with `WWW-Authenticate: Bearer error="invalid_token"`: the token itself is missing, expired, forged or revoked. Get a new one.
-    - `403` with `WWW-Authenticate: Bearer error="insufficient_scope"`: the token is valid, but does not cover this request. A new token with more scope is needed, and the user may have to approve it.
+    - `401` dengan `WWW-Authenticate: Bearer error="invalid_token"`: token-nya sendiri hilang, kedaluwarsa, dipalsukan, atau dicabut. Minta yang baru.
+    - `403` dengan `WWW-Authenticate: Bearer error="insufficient_scope"`: token valid, tapi nggak mencakup request ini. Butuh token baru dengan scope lebih banyak, dan user mungkin harus menyetujuinya.
 
-    Least privilege applies as it does everywhere: ask for what the feature needs. A token that carries `photos.read` cannot be used to delete anything even if the app is compromised.
+    Least privilege berlaku seperti di mana-mana: minta apa yang dibutuhkan fitur itu. Token yang membawa `photos.read` nggak bisa dipakai menghapus apa pun, bahkan kalau app-nya dikompromikan.
   </Step>
 
   <Step id="state" title="State">
-    The redirect back to the client is a plain `GET` with a code in the query. The client cannot tell by looking whether it **asked** for this response. Without a check, an attacker can start a flow with their own account, stop before redeeming the code, and give the URL to a victim.
+    Redirect balik ke client adalah `GET` biasa dengan code di query. Client nggak bisa tahu cuma dengan melihat apakah dia **memang meminta** response ini. Tanpa pengecekan, attacker bisa memulai flow dengan akunnya sendiri, berhenti sebelum menukar code, lalu memberikan URL-nya ke korban.
 
     <SequenceFlow flow={flows.stateCsrf} />
 
-    The defense is the `state` parameter (RFC 6749 section 10.12):
+    Pertahanannya adalah parameter `state` (RFC 6749 section 10.12):
 
-    1. Before redirecting, the client creates an unguessable random value and ties it to **this browser session**, for example in memory or in sessionStorage.
-    2. It sends it in `/authorize`. The authorization server returns it unchanged in the redirect, on success and on error.
-    3. On the callback, the client compares the returned value with the stored one and discards the response on any mismatch, including a missing one.
+    1. Sebelum redirect, client membuat nilai acak yang nggak bisa ditebak dan mengikatnya ke **session browser ini**, misalnya di memory atau sessionStorage.
+    2. Dia mengirimnya di `/authorize`. Authorization server mengembalikannya tanpa berubah di redirect, baik saat sukses maupun error.
+    3. Di callback, client membandingkan nilai yang kembali dengan yang tersimpan dan membuang response kalau ada ketidakcocokan, termasuk kalau nilainya hilang.
 
-    The lab's SPA does exactly this and shows the failure if you open a callback by hand: *Check the returned state, rejected*.
+    SPA di lab melakukan persis ini dan menampilkan kegagalannya kalau kamu membuka callback secara manual: *Check the returned state, rejected*.
 
     <Callout type="info">
-      RFC 9700 notes that PKCE also stops this attack when the client uses it correctly with a server that enforces it, because the attacker's code cannot be redeemed with the victim's verifier. `state` is still the common, simple guard, and it is also used to carry app state such as the page to return to. Do both.
+      RFC 9700 mencatat bahwa PKCE juga menghentikan serangan ini kalau client memakainya dengan benar bersama server yang menegakkannya, karena code milik attacker nggak bisa ditukar dengan verifier milik korban. `state` tetap pengaman yang umum dan sederhana, dan juga dipakai untuk membawa state app seperti halaman tujuan setelah login. Pakai keduanya.
     </Callout>
   </Step>
 
-  <Step id="redirect" title="Redirect URIs">
-    The `redirect_uri` is where the browser (and the code) is sent. It is the most attacked parameter in OAuth, because whoever receives the code is one step from a token.
+  <Step id="redirect" title="Redirect URI">
+    `redirect_uri` adalah tujuan browser (dan code) dikirim. Dia parameter yang paling sering diserang di OAuth, karena siapa pun yang menerima code tinggal selangkah dari token.
 
-    The rules (RFC 6749 section 3.1.2, RFC 9700 section 2.1, OAuth 2.1):
+    Aturannya (RFC 6749 section 3.1.2, RFC 9700 section 2.1, OAuth 2.1):
 
-    - **Register ahead of time**, one entry per exact URI.
-    - **Compare by exact string.** No prefix, no wildcard, no "starts with the registered host". `https://app.example/callback.evil` and `https://app.example/callback/../evil` are not `https://app.example/callback`.
-    - **Never redirect on a bad value.** An unregistered `redirect_uri` or `client_id` gets an error page. Redirecting would make the server an open redirector.
-    - **Use HTTPS** in production. The lab uses `http://localhost`, which RFC 8252 allows for loopback redirects.
+    - **Daftarkan di awal**, satu entri per URI yang persis.
+    - **Bandingkan dengan exact string.** Bukan prefix, bukan wildcard, bukan "diawali host yang terdaftar". `https://app.example/callback.evil` dan `https://app.example/callback/../evil` bukan `https://app.example/callback`.
+    - **Jangan pernah redirect untuk nilai yang salah.** `redirect_uri` atau `client_id` yang tidak terdaftar mendapat halaman error. Me-redirect menjadikan server open redirector.
+    - **Pakai HTTPS** di production. Lab memakai `http://localhost`, yang diizinkan RFC 8252 untuk redirect loopback.
 
-    The vulnerable mode of the lab degrades the exact comparison into a **prefix match**, the real-world bug behind many "redirect URI bypass" reports. You will exploit it in *Break it*.
+    Vulnerable mode di lab menurunkan perbandingan persis menjadi **prefix match**, bug nyata di balik banyak laporan "redirect URI bypass". Kamu akan mengeksploitasinya di *Break it*.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    The builder assembles an `/authorize` URL from its fields, encodes each value and explains each parameter. **Open in a new tab** launches it against the implementation you selected.
+    Builder menyusun URL `/authorize` dari field-fieldnya, meng-encode tiap nilai, dan menjelaskan tiap parameter. **Buka di tab baru** meluncurkannya ke implementasi yang kamu pilih.
 
     <LabTasks />
 
     <OAuthUrlBuilder />
 
-    **Task 1, a 400 from the redirect check.** Click **Use the .evil redirect**, leave vulnerable mode unticked and click **Open in a new tab**. You get an error page, not a sign-in page: the server refused to trust the redirect URI. The Inspector shows `GET /authorize` with `400`.
+    **Task 1, 400 dari pengecekan redirect.** Klik **Use the .evil redirect**, biarkan vulnerable mode tidak dicentang, lalu klik **Buka di tab baru**. Kamu mendapat halaman error, bukan halaman login: server menolak mempercayai redirect URI itu. Inspector menampilkan `GET /authorize` dengan `400`.
 
-    **Task 2, a valid token that lacks a scope.** This one needs a token whose scope is only `profile`. The browser would swallow the code, so read it from the Inspector and finish with `curl`. Use the port of your selected implementation (`4103`/`4123` for Go, `4203`/`4223` for TypeScript).
+    **Task 2, token valid yang kekurangan scope.** Ini butuh token yang scope-nya hanya `profile`. Browser akan menelan code-nya, jadi baca dari Inspector dan selesaikan dengan `curl`. Pakai port implementasi yang kamu pilih (`4103`/`4123` untuk Go, `4203`/`4223` untuk TypeScript).
 
-    1. In the builder click **Reset redirect**, set `scope` to `profile`, **clear** the `code_challenge` box and tick **Vulnerable mode** (that skips PKCE so the `curl` stays short; the scope lesson does not depend on it). Open the URL, sign in and approve. The tab will show the client app rejecting a response it did not ask for. That is expected.
-    2. In the Inspector select `POST /consent` and copy the `code` out of the **Location** header.
-    3. Redeem it (replace `CODE`):
+    1. Di builder klik **Reset redirect**, ubah `scope` jadi `profile`, **kosongkan** kotak `code_challenge`, dan centang **Vulnerable mode** (itu melewati PKCE supaya `curl` tetap pendek; pelajaran scope nggak bergantung padanya). Buka URL-nya, login, dan approve. Tab akan menampilkan app client menolak response yang tidak diminta. Itu memang diharapkan.
+    2. Di Inspector pilih `POST /consent` dan salin `code` dari header **Location**.
+    3. Tukar (ganti `CODE`):
 
        ```bash
        curl -s -X POST http://localhost:4103/token \
@@ -93,110 +93,110 @@ import { flows } from "@/content/flows";
          -d redirect_uri=http://localhost:4113/callback
        ```
 
-       The answer has `"scope":"profile"`. Copy the `access_token`.
-    4. Call the API with it (replace `TOKEN`):
+       Jawabannya berisi `"scope":"profile"`. Salin `access_token`.
+    4. Panggil API dengannya (ganti `TOKEN`):
 
        ```bash
        curl -i http://localhost:4123/api/photos -H "Authorization: Bearer TOKEN"
        ```
 
-       The answer is `403` with `WWW-Authenticate: Bearer error="insufficient_scope", scope="photos.read"`. The token is genuine and unexpired. It just does not cover photos.
+       Jawabannya `403` dengan `WWW-Authenticate: Bearer error="insufficient_scope", scope="photos.read"`. Token-nya asli dan belum kedaluwarsa. Dia cuma nggak mencakup foto.
 
-    The code lives only 60 seconds, so do steps 2 and 3 straight away.
+    Code hanya hidup 60 detik, jadi lakukan langkah 2 dan 3 langsung.
   </Step>
 
   <Step id="breakit" title="Break it">
-    The redirect prefix attack. The attacker asks for a `redirect_uri` that **starts with** the registered one: `.../callback.evil`. The same request goes to the secure server and to the vulnerable one.
+    Redirect prefix attack. Attacker meminta `redirect_uri` yang **diawali** dengan yang terdaftar: `.../callback.evil`. Request yang sama dikirim ke secure server dan ke vulnerable server.
 
     <OAuthUrlBuilder attack />
 
-    You are looking for `400` on the secure side and `200` on the vulnerable side. A `200` there means the server accepted the evil URI and showed its sign-in page. If a user approved, the code would be sent to `callback.evil`, a URL the attacker controls, and PKCE would be the only thing left between them and a token.
+    Yang kamu cari: `400` di sisi secure dan `200` di sisi vulnerable. `200` di sana berarti server menerima URI jahat itu dan menampilkan halaman login-nya. Kalau user approve, code akan dikirim ke `callback.evil`, URL yang dikendalikan attacker, dan PKCE jadi satu-satunya yang tersisa antara mereka dan sebuah token.
 
-    To see it through, set the redirect to the `.evil` one, tick **Vulnerable mode**, and open the URL: the final redirect lands on a page that does not exist, with the code visible in the address bar. In a real attack that page is the attacker's.
+    Untuk melihatnya sampai tuntas, set redirect ke yang `.evil`, centang **Vulnerable mode**, dan buka URL-nya: redirect terakhir mendarat di halaman yang nggak ada, dengan code terlihat di address bar. Di serangan nyata, halaman itu milik attacker.
 
     <Callout type="security">
-      The defense is one line: compare the strings. Do not parse the URI and compare only the host, do not allow a wildcard, and do not treat a registered URI as a prefix. Add a path or query by registering that exact URI.
+      Pertahanannya satu baris: bandingkan string-nya. Jangan mem-parse URI lalu membandingkan host saja, jangan izinkan wildcard, dan jangan perlakukan URI terdaftar sebagai prefix. Mau menambah path atau query? Daftarkan URI persis itu.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    The exact-match rule. The comment names the bug that the vulnerable branch recreates.
+  <Step id="code" title="Kode">
+    Aturan exact-match. Komentarnya menyebut bug yang dibuat ulang oleh cabang vulnerable.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/clients.go#L43-L52"
       ts="labs/03-oauth-pkce/ts/src/clients.ts#L31-L36"
       notes={{
-        48: "Vulnerable mode only: a prefix match. callback.evil passes.",
-        50: "The normal path: exact string equality.",
-        36: "The same: a prefix match in vulnerable mode, exact equality otherwise.",
+        48: "Hanya di vulnerable mode: prefix match. callback.evil lolos.",
+        50: "Jalur normal: kesamaan string yang persis.",
+        36: "Sama: prefix match di vulnerable mode, kesamaan persis di luar itu.",
       }}
     />
 
-    How `state` comes back, and where the code is attached. The state is echoed on success and on error.
+    Gimana `state` kembali, dan di mana code ditempelkan. State di-echo saat sukses dan saat error.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/as.go#L219-L237"
       ts="labs/03-oauth-pkce/ts/src/as.ts#L90-L102"
       notes={{
-        228: "The code (or error) is added to the redirect query.",
-        231: "state is echoed unchanged, on success and on error.",
-        98: "The code (or error) is added to the redirect query.",
-        99: "state is echoed unchanged, on success and on error.",
+        228: "Code (atau error) ditambahkan ke query redirect.",
+        231: "state di-echo tanpa berubah, saat sukses dan saat error.",
+        98: "Code (atau error) ditambahkan ke query redirect.",
+        99: "state di-echo tanpa berubah, saat sukses dan saat error.",
       }}
     />
 
-    The resource server enforces the scope. A valid token without `photos.read` is `403`, not `401`.
+    Resource server menegakkan scope. Token valid tanpa `photos.read` itu `403`, bukan `401`.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/api.go#L155-L161"
       ts="labs/03-oauth-pkce/ts/src/api.ts#L47-L52"
       notes={{
-        156: "The scope claim is split and must contain photos.read.",
-        157: "RFC 6750: a valid token that is too weak gets insufficient_scope.",
-        158: "403, not 401.",
-        48: "The scope claim must contain photos.read.",
-        49: "RFC 6750: a valid token that is too weak gets insufficient_scope.",
-        50: "403, not 401.",
+        156: "Claim scope di-split dan harus berisi photos.read.",
+        157: "RFC 6750: token valid yang terlalu lemah mendapat insufficient_scope.",
+        158: "403, bukan 401.",
+        48: "Claim scope harus berisi photos.read.",
+        49: "RFC 6750: token valid yang terlalu lemah mendapat insufficient_scope.",
+        50: "403, bukan 401.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "A scope is only useful if the resource server checks it on every request. Valid token without the scope: 403 insufficient_scope.",
-        "Request least privilege. The server limits each client to the scopes registered for it.",
-        "state is an unguessable value tied to the browser session and checked on the callback, to reject responses the client did not ask for.",
-        "Register redirect URIs and compare them by exact string. Prefix and wildcard matching deliver codes to attackers.",
-        "A bad client_id or redirect_uri gets an error page, never a redirect.",
+        "Scope baru berguna kalau resource server mengeceknya di setiap request. Token valid tanpa scope itu: 403 insufficient_scope.",
+        "Minta least privilege. Server membatasi tiap client ke scope yang terdaftar untuknya.",
+        "state adalah nilai yang nggak bisa ditebak, terikat ke session browser, dan dicek di callback, untuk menolak response yang tidak diminta client.",
+        "Daftarkan redirect URI dan bandingkan dengan exact string. Prefix dan wildcard matching mengantarkan code ke attacker.",
+        "client_id atau redirect_uri yang salah mendapat halaman error, tidak pernah redirect.",
       ]}
       interview={[
         {
-          q: "What is the difference between a 401 and a 403 from a resource server?",
-          a: "401 means the credentials are missing or not valid: no token, or an expired, forged or revoked one. 403 means the token is valid but does not allow this action. For a bearer token RFC 6750 uses error=invalid_token with 401 and error=insufficient_scope with 403.",
+          q: "Apa beda 401 dan 403 dari sebuah resource server?",
+          a: "401 berarti credential hilang atau tidak valid: tanpa token, atau token kedaluwarsa, dipalsukan, atau dicabut. 403 berarti token valid tapi nggak mengizinkan aksi ini. Untuk bearer token, RFC 6750 memakai error=invalid_token dengan 401 dan error=insufficient_scope dengan 403.",
         },
         {
-          q: "What is the state parameter for?",
-          a: "To prevent cross-site request forgery on the redirect. The client generates an unguessable value tied to the user's session, sends it with the authorization request and checks that the same value comes back. Otherwise an attacker could make the victim's client redeem the attacker's code.",
+          q: "Parameter state itu untuk apa?",
+          a: "Untuk mencegah cross-site request forgery pada redirect. Client membuat nilai yang nggak bisa ditebak, terikat ke session user, mengirimnya bersama authorization request, dan mengecek bahwa nilai yang sama kembali. Kalau nggak, attacker bisa membuat client milik korban menukar code milik attacker.",
         },
         {
-          q: "How strictly should redirect URIs be matched, and why?",
-          a: "By exact string comparison against pre-registered values. Any looser rule, such as a prefix, wildcard or host-only match, lets an attacker craft an accepted URI that points to their own page and capture the authorization code or token.",
+          q: "Seketat apa redirect URI harus dicocokkan, dan kenapa?",
+          a: "Dengan exact string comparison terhadap nilai yang didaftarkan lebih dulu. Aturan yang lebih longgar, seperti prefix, wildcard, atau host-only match, membuat attacker bisa menyusun URI yang diterima tapi mengarah ke halamannya sendiri dan menangkap authorization code atau token.",
         },
         {
-          q: "Where are scopes enforced?",
-          a: "At the resource server. The authorization server decides what to grant and puts it in the token, but the API has to read the scope on each request and refuse anything outside it. A scope on the consent page alone protects nothing.",
+          q: "Di mana scope ditegakkan?",
+          a: "Di resource server. Authorization server memutuskan apa yang diberikan dan menaruhnya di token, tapi API harus membaca scope di setiap request dan menolak apa pun di luarnya. Scope di halaman consent saja nggak melindungi apa-apa.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why the redirect check must be an exact match, using the callback.evil example you just ran."
+      prompt="Jelaskan ke rekan satu tim kenapa pengecekan redirect harus exact match, pakai contoh callback.evil yang baru kamu jalankan."
       rubric={[
-        "callback.evil starts with the registered URI but is a different URL the attacker controls",
-        "A prefix match accepted it, so the code would be delivered to the attacker",
-        "The secure server compared strings exactly and answered with an error page, not a redirect",
-        "Register each valid URI separately instead of loosening the comparison",
+        "callback.evil diawali URI terdaftar tapi merupakan URL lain yang dikendalikan attacker",
+        "Prefix match menerimanya, jadi code akan dikirim ke attacker",
+        "Secure server membandingkan string dengan persis dan menjawab dengan halaman error, bukan redirect",
+        "Daftarkan tiap URI valid secara terpisah, jangan melonggarkan perbandingannya",
       ]}
     />
   </Step>

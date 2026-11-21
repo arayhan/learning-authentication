@@ -70,7 +70,7 @@ describe("TokenDecoder", () => {
     expect(within(screen.getByLabelText("Header")).getByText(/"alg": "RS256"/)).toBeInTheDocument();
     expect(within(screen.getByLabelText("Payload")).getByText(/"email": "alice@example.com"/)).toBeInTheDocument();
     expect(within(screen.getByLabelText("Signature")).getByText("c2lnbmF0dXJl")).toBeInTheDocument();
-    expect(screen.getByText("expires in 5 minutes")).toBeInTheDocument();
+    expect(screen.getByText("kedaluwarsa 5 menit lagi")).toBeInTheDocument();
     // every known claim has an explanation
     for (const claim of ["iss", "sub", "aud", "exp", "iat", "jti", "kid", "alg"]) expect(screen.getByTestId(`claim-${claim}`)).toHaveAttribute("title");
   });
@@ -79,7 +79,7 @@ describe("TokenDecoder", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     wrap(<TokenDecoder defaultToken={token(nowSec - 7200)} />);
-    expect(screen.getByText("expired 2 hours ago")).toBeInTheDocument();
+    expect(screen.getByText("sudah kedaluwarsa 2 jam lalu")).toBeInTheDocument();
   });
 
   it("shows an inline error for garbage input and never throws", () => {
@@ -87,7 +87,7 @@ describe("TokenDecoder", () => {
     const box = screen.getByLabelText("JWT");
     for (const garbage of ["hello", "a.b.c", "....", "eyJ.eyJ.sig", "%%%.%%%.%%%", `${b64("str")}.${b64([1])}.x`, "a.b.c.d"]) {
       fireEvent.change(box, { target: { value: garbage } });
-      expect(screen.getByRole("alert")).toHaveTextContent(/not a valid JWT/i);
+      expect(screen.getByRole("alert")).toHaveTextContent(/bukan JWT yang valid/i);
       expect(screen.queryByLabelText("Header")).not.toBeInTheDocument();
     }
     fireEvent.change(box, { target: { value: "" } });
@@ -105,7 +105,7 @@ describe("TokenDecoder", () => {
 
   it("warns about alg none and never offers it as valid", () => {
     wrap(<TokenDecoder defaultToken={`${b64({ alg: "none" })}.${b64({ sub: "x" })}.`} />);
-    expect(screen.getByText(/alg is "none"/i)).toBeInTheDocument();
+    expect(screen.getByText(/alg adalah "none"/i)).toBeInTheDocument();
   });
 
   it("verifies a real RS256 token against the lab JWKS (RS256 pinned, issuer and audience checked)", async () => {
@@ -122,13 +122,13 @@ describe("TokenDecoder", () => {
     const { calls } = fakeFetch(() => json(200, { keys: [jwk] }));
 
     wrap(<TokenDecoder defaultToken={await sign("lab02-api")} />);
-    await userEvent.click(screen.getByRole("button", { name: /verify with lab jwks/i }));
+    await userEvent.click(screen.getByRole("button", { name: /verify pakai jwks lab/i }));
     expect(await screen.findByText(/signature valid/i)).toBeInTheDocument();
     expect(calls[0].url).toBe("http://localhost:4102/.well-known/jwks.json");
 
     fireEvent.change(screen.getByLabelText("JWT"), { target: { value: await sign("some-other-api") } });
-    await userEvent.click(screen.getByRole("button", { name: /verify with lab jwks/i }));
-    expect(await screen.findByText(/verification failed.*aud/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /verify pakai jwks lab/i }));
+    expect(await screen.findByText(/verifikasi gagal.*aud/i)).toBeInTheDocument();
   });
 
   it("shows the offline card with the start command when the lab is down", async () => {
@@ -136,36 +136,36 @@ describe("TokenDecoder", () => {
       throw new TypeError("Failed to fetch");
     });
     wrap(<TokenDecoder defaultToken={token(nowSec + 300)} />);
-    await userEvent.click(screen.getByRole("button", { name: /verify with lab jwks/i }));
-    expect(await screen.findByText("Lab 02 (Go) is not running")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /verify pakai jwks lab/i }));
+    expect(await screen.findByText("Lab 02 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 02 --go")).toBeInTheDocument();
   });
 });
 
 describe("StorageSim", () => {
-  const runScript = () => userEvent.click(screen.getByRole("button", { name: /run xss script/i }));
+  const runScript = () => userEvent.click(screen.getByRole("button", { name: /jalankan script xss/i }));
   const row = (name: RegExp) => screen.getByRole("row", { name });
 
   it("shows which stores leak and marks the HttpOnly cookie not readable", async () => {
     fakeFetch(() => json(404, {}));
     wrap(<StorageSim />);
     await runScript();
-    expect(within(row(/localStorage/)).getByText("leaked")).toBeInTheDocument();
-    expect(within(row(/sessionStorage/)).getByText("leaked")).toBeInTheDocument();
-    expect(within(row(/global variable/i)).getByText("leaked")).toBeInTheDocument();
-    expect(within(row(/closure/i)).getByText("not readable")).toBeInTheDocument();
-    expect(within(row(/HttpOnly cookie/)).getByText("not readable")).toBeInTheDocument();
+    expect(within(row(/localStorage/)).getByText("bocor")).toBeInTheDocument();
+    expect(within(row(/sessionStorage/)).getByText("bocor")).toBeInTheDocument();
+    expect(within(row(/variabel global/i)).getByText("bocor")).toBeInTheDocument();
+    expect(within(row(/closure/i)).getByText("nggak terbaca")).toBeInTheDocument();
+    expect(within(row(/Cookie HttpOnly/)).getByText("nggak terbaca")).toBeInTheDocument();
   });
 
   it("is honest that the script can still use the session, and sends the attack event once", async () => {
     const { posts } = fakeFetch(() => json(404, {}));
     wrap(<StorageSim />);
-    expect(screen.queryByText(/can still use/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/tetap bisa memakai/i)).not.toBeInTheDocument();
     await runScript();
     await waitFor(() => expect(posts).toEqual([{ kind: "attack", ref: "m2-l4/xss-storage" }]));
     await runScript();
-    await userEvent.click(screen.getByRole("button", { name: /call the api from the page/i }));
-    expect(screen.getByText(/can still use/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /panggil api dari halaman/i }));
+    expect(screen.getByText(/tetap bisa memakai/i)).toBeInTheDocument();
     expect(posts).toHaveLength(1);
   });
 });
@@ -180,7 +180,7 @@ describe("JwtAttackLab", () => {
     }
     return json(404, {});
   };
-  const run = (id: string) => userEvent.click(screen.getByRole("button", { name: new RegExp(`run ${id}`, "i") }));
+  const run = (id: string) => userEvent.click(screen.getByRole("button", { name: new RegExp(`jalankan ${id}`, "i") }));
 
   it("sends exactly 3 attack events, one per card, after observing secure 401 and vulnerable 200", async () => {
     const { posts, calls } = fakeFetch(labFor());
@@ -221,7 +221,7 @@ describe("JwtAttackLab", () => {
     const { posts } = fakeFetch(labFor({ offline: true }));
     wrap(<JwtAttackLab />);
     await run("expired");
-    expect(await screen.findByText("Lab 02 (Go) is not running")).toBeInTheDocument();
+    expect(await screen.findByText("Lab 02 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 02 --go")).toBeInTheDocument();
     expect(posts).toEqual([]);
   });

@@ -9,7 +9,7 @@ export function AppShell({
   userName,
   left,
   right,
-  rightTitle = "Guide",
+  rightTitle = "Panduan",
   children,
 }: {
   userName: string;

@@ -2,168 +2,168 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Lesson 2 left one soft spot. The authorization code travels through the browser, and anything that can read that URL can get it. On a phone it is worse: the redirect goes to a custom URL scheme such as `com.example.bank:/callback`, and **any installed app can claim the same scheme**.
+    Lesson 2 meninggalkan satu titik lemah. Authorization code lewat browser, dan apa pun yang bisa membaca URL itu bisa mengambilnya. Di HP lebih parah: redirect menuju custom URL scheme seperti `com.example.bank:/callback`, dan **app apa pun yang terpasang bisa mengklaim scheme yang sama**.
 
-    If a stolen code can be redeemed by whoever holds it, the code is worth a token. PKCE (pronounced "pixy", RFC 7636) makes the code worthless to anyone but the app that asked for it.
+    Kalau code curian bisa ditukar oleh siapa pun yang memegangnya, code itu bernilai sama dengan token. PKCE (dibaca "pixy", RFC 7636) membuat code nggak berharga bagi siapa pun kecuali app yang memintanya.
 
-    <Analogy title="The torn ticket">
-      Tear a ticket in half and keep one half at home. Hand the other half to the clerk at the start. The clerk only gives you the prize when the two halves fit, so a thief with one half gets nothing.
+    <Analogy title="Tiket yang disobek dua">
+      Sobek selembar tiket jadi dua dan simpan separuhnya di rumah. Serahkan separuh lainnya ke petugas di awal. Petugas hanya memberi hadiahnya kalau kedua sobekan itu pas, jadi pencuri yang cuma pegang satu sobekan nggak dapat apa-apa.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    PKCE adds one secret and one commitment to the flow. Both are made fresh for every authorization request.
+  <Step id="concept" title="Konsep">
+    PKCE menambahkan satu secret dan satu komitmen ke flow. Keduanya dibuat baru di setiap authorization request.
 
-    1. The client creates a **`code_verifier`**: a random string of 43 to 128 characters from `A-Z a-z 0-9 - . _ ~`. Typically 32 random bytes, base64url encoded, which is 43 characters.
-    2. It computes **`code_challenge = BASE64URL(SHA-256(code_verifier))`**, no padding. This is the `S256` method.
-    3. `/authorize` gets the `code_challenge` and `code_challenge_method=S256`. The server stores the challenge with the code it issues.
-    4. `/token` gets the `code_verifier`. The server hashes it and compares with the stored challenge, in constant time. Different means `invalid_grant`.
+    1. Client membuat **`code_verifier`**: string acak sepanjang 43 sampai 128 karakter dari `A-Z a-z 0-9 - . _ ~`. Biasanya 32 byte acak yang di-encode base64url, yaitu 43 karakter.
+    2. Dia menghitung **`code_challenge = BASE64URL(SHA-256(code_verifier))`**, tanpa padding. Ini metode `S256`.
+    3. `/authorize` menerima `code_challenge` dan `code_challenge_method=S256`. Server menyimpan challenge bersama code yang diterbitkannya.
+    4. `/token` menerima `code_verifier`. Server meng-hash-nya dan membandingkan dengan challenge yang tersimpan, dalam constant time. Beda berarti `invalid_grant`.
 
     <SequenceFlow flow={flows.authCodePkce} />
 
-    The security comes from the direction of the hash. The challenge crosses the front channel, where an attacker can see it, but SHA-256 cannot be run backwards. The verifier crosses only the back channel, **after** the code was issued. An attacker who saw the redirect has the code and the challenge, and needs the verifier.
+    Keamanannya datang dari arah hash. Challenge melewati front channel, tempat attacker bisa melihatnya, tapi SHA-256 nggak bisa dijalankan mundur. Verifier hanya lewat back channel, **setelah** code diterbitkan. Attacker yang melihat redirect punya code dan challenge, dan masih butuh verifier.
 
-    Some rules that come straight from the RFCs:
+    Beberapa aturan yang langsung dari RFC:
 
-    - **Use S256.** The `plain` method sends the verifier itself, which defeats the purpose. RFC 7636 only tolerates it for clients that cannot hash.
-    - **A new verifier per request.** Never a constant, never derived from something an attacker can guess.
-    - **The server must enforce it.** A server that accepts a missing challenge when the client could have sent one is open to a downgrade: the attacker strips the challenge from the request. The lab's secure `/authorize` rejects a request without a valid S256 challenge.
-    - **Everyone should use it.** RFC 9700 requires PKCE for public clients and recommends it for confidential ones. OAuth 2.1 requires it for every client that uses the authorization code flow.
+    - **Pakai S256.** Metode `plain` mengirim verifier itu sendiri, yang menggagalkan tujuannya. RFC 7636 hanya mentoleransinya untuk client yang nggak bisa melakukan hash.
+    - **Verifier baru untuk setiap request.** Jangan pernah konstan, jangan pernah diturunkan dari sesuatu yang bisa ditebak attacker.
+    - **Server harus menegakkannya.** Server yang menerima challenge kosong padahal client bisa mengirimnya rawan downgrade: attacker membuang challenge dari request. `/authorize` yang secure di lab menolak request tanpa S256 challenge yang valid.
+    - **Semua client sebaiknya memakainya.** RFC 9700 mewajibkan PKCE untuk public client dan merekomendasikannya untuk confidential client. OAuth 2.1 mewajibkannya untuk setiap client yang memakai authorization code flow.
 
     <Callout type="info">
-      PKCE was invented for mobile apps (RFC 7636 calls the attack the *authorization code interception attack*). It now also stops a code that was **injected** into a flow, and it is the reason the SPA flow is safe without a client secret.
+      PKCE awalnya dibuat untuk mobile app (RFC 7636 menyebut serangannya *authorization code interception attack*). Sekarang dia juga menghentikan code yang **disuntikkan** ke sebuah flow, dan dialah alasan flow SPA aman tanpa client secret.
     </Callout>
   </Step>
 
-  <Step id="generator" title="Make a challenge">
-    Compute one yourself. The generator takes a verifier, shows its bytes, the SHA-256 digest and the base64url result, and updates as you type. Click **Use the RFC 7636 example** and compare the result with Appendix B of the RFC: `E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM`.
+  <Step id="generator" title="Bikin challenge">
+    Hitung sendiri satu challenge. Generator menerima verifier, menampilkan byte-nya, digest SHA-256, dan hasil base64url, dan ikut berubah saat kamu mengetik. Klik **Pakai contoh RFC 7636** dan bandingkan hasilnya dengan Appendix B di RFC: `E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM`.
 
     <PkceGenerator />
 
-    Try editing a single character of the verifier. The challenge changes completely, and no partial change in the verifier gives a partial match. That is why a guess is useless.
+    Coba ubah satu karakter saja di verifier. Challenge berubah total, dan nggak ada perubahan sebagian pada verifier yang menghasilkan kecocokan sebagian. Itu sebabnya menebak itu percuma.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Make the server reject a verifier. In the generator above, click **Test a wrong verifier**. It posts a freshly invented verifier to the lab's `POST /token` and shows the answer: `400 invalid_grant`.
+    Bikin server menolak sebuah verifier. Di generator di atas, klik **Tes verifier yang salah**. Dia mem-post verifier karangan baru ke `POST /token` milik lab dan menampilkan jawabannya: `400 invalid_grant`.
 
     <LabTasks />
 
-    Open the `POST /token` row in the Inspector and look at the request body: `grant_type`, `client_id`, `code`, `redirect_uri`, `code_verifier`. The response body is `{"error":"invalid_grant"}`.
+    Buka baris `POST /token` di Inspector dan lihat body request-nya: `grant_type`, `client_id`, `code`, `redirect_uri`, `code_verifier`. Body response-nya `{"error":"invalid_grant"}`.
 
-    By default the button sends a made-up code, so the server cannot tell you whether the code or the verifier was wrong, and it will not say. That is by design (RFC 6749 section 5.2 uses one error, `invalid_grant`, for a bad, expired, used or mismatched grant). To see the verifier mismatch alone, finish the *Break it* step first, copy a **PKCE** code from it, paste it into the generator and run the test again.
+    Secara default tombol itu mengirim code karangan, jadi server nggak bisa bilang apakah code atau verifier yang salah, dan memang nggak akan bilang. Itu disengaja (RFC 6749 section 5.2 memakai satu error, `invalid_grant`, untuk grant yang buruk, kedaluwarsa, sudah dipakai, atau tidak cocok). Untuk melihat ketidakcocokan verifier saja, selesaikan dulu langkah *Break it*, salin code **PKCE** dari sana, tempel ke generator, dan jalankan tes lagi.
   </Step>
 
   <Step id="breakit" title="Break it">
-    Now play the malicious app. The lab cannot run a second app on your phone, so the attack is staged with two browser tabs and the lab's attacker helper.
+    Sekarang berperan jadi app jahat. Lab nggak bisa menjalankan app kedua di HP-mu, jadi serangannya dipentaskan dengan dua tab browser dan attacker helper milik lab.
 
     <SequenceFlow flow={flows.codeInterception} />
 
-    How the exercise works:
+    Cara kerja latihannya:
 
-    1. **Flow A, no PKCE.** Click the first button. A tab opens at the lab's `/authorize` with `lab_mode=vulnerable` and no `code_challenge`: the vulnerable mode lets a request through without PKCE. Sign in as `alice@example.com` and approve. Your tab lands on the client at `/callback` and ignores the response, which is fine: **the code was never redeemed**. The component reads the code from the lab trace, the same URL a malicious app would have received.
-    2. **Flow B, PKCE.** Do the same with the second button, which sends an S256 challenge.
-    3. **Replay each code as the attacker.** The lab's `/__attack/intercept` helper does what the malicious app would do: it knows the code and the redirect URI it saw, but not the verifier, and it calls the token endpoint. The helper only exists in vulnerable mode.
+    1. **Flow A, tanpa PKCE.** Klik tombol pertama. Sebuah tab terbuka di `/authorize` milik lab dengan `lab_mode=vulnerable` dan tanpa `code_challenge`: vulnerable mode membiarkan request lolos tanpa PKCE. Login sebagai `alice@example.com` dan approve. Tab-mu mendarat di client pada `/callback` dan mengabaikan response, dan itu nggak masalah: **code-nya belum pernah ditukar**. Komponen membaca code dari trace lab, URL yang sama yang akan diterima app jahat.
+    2. **Flow B, PKCE.** Lakukan hal yang sama dengan tombol kedua, yang mengirim S256 challenge.
+    3. **Replay tiap code sebagai attacker.** Helper `/__attack/intercept` milik lab melakukan apa yang dilakukan app jahat: dia tahu code dan redirect URI yang dilihatnya, tapi nggak tahu verifier, lalu memanggil token endpoint. Helper itu hanya ada di vulnerable mode.
 
     <Shot
       src="/shots/lab03-login.png"
-      alt="The Lab 03 authorization server sign-in page: a card titled Sign in, continuing to Demo SPA, with email and password fields and a Sign in button."
-      caption="The page each flow's new tab lands on. Sign in as alice@example.com, then approve."
+      alt="Halaman login authorization server Lab 03: kartu berjudul Sign in, melanjutkan ke Demo SPA, dengan field email dan password serta tombol Sign in."
+      caption="Halaman tujuan tab baru tiap flow. Login sebagai alice@example.com, lalu approve."
     />
 
-    You are looking for `200` for Flow A and `400` for Flow B.
+    Yang kamu cari: `200` untuk Flow A dan `400` untuk Flow B.
 
     <InterceptionAttack />
 
-    Flow A produced an access token for alice, because a code issued without a challenge is a bearer secret. Flow B was **the same attack with the same capture**, and it failed. The attacker's failed attempt also did not burn the code: the real app could still redeem it with its verifier.
+    Flow A menghasilkan access token untuk alice, karena code yang diterbitkan tanpa challenge itu bearer secret. Flow B adalah **serangan yang sama dengan hasil tangkapan yang sama**, dan gagal. Percobaan gagal attacker juga nggak menghanguskan code: app asli masih bisa menukarnya dengan verifier-nya.
 
     <Callout type="security">
-      PKCE does not stop the code from being stolen. It makes the stolen code useless. RFC 8252 adds the rest of the picture for mobile apps: prefer a claimed `https` link over a custom scheme, always use the system browser, and treat a custom scheme as shared.
+      PKCE nggak mencegah code dicuri. Dia membuat code curian jadi nggak berguna. RFC 8252 melengkapi gambaran untuk mobile app: pilih link `https` yang diklaim ketimbang custom scheme, selalu pakai system browser, dan anggap custom scheme itu dipakai bersama.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    The challenge and the verification. The server never needs the verifier until `/token`, and it only needs to repeat the client's hash.
+  <Step id="code" title="Kode">
+    Challenge dan verifikasinya. Server nggak butuh verifier sampai `/token`, dan dia cuma perlu mengulang hash dari client.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/pkce.go#L20-L32"
       ts="labs/03-oauth-pkce/ts/src/pkce.ts#L8-L19"
       notes={{
-        21: "SHA-256 of the verifier's ASCII bytes.",
-        22: "Base64url with no padding: 43 characters. This is the code_challenge.",
-        28: "The verifier must also be well formed: 43 to 128 characters of the unreserved set.",
-        31: "Compared in constant time. plain is not supported, so sending the challenge as the verifier fails.",
-        9: "BASE64URL(SHA256(ASCII(verifier))), no padding.",
-        19: "Well formed and hashing to the stored challenge, compared in constant time.",
+        21: "SHA-256 dari byte ASCII verifier.",
+        22: "Base64url tanpa padding: 43 karakter. Inilah code_challenge.",
+        28: "Verifier juga harus berbentuk benar: 43 sampai 128 karakter dari set unreserved.",
+        31: "Dibandingkan dalam constant time. plain tidak didukung, jadi mengirim challenge sebagai verifier gagal.",
+        9: "BASE64URL(SHA256(ASCII(verifier))), tanpa padding.",
+        19: "Berbentuk benar dan di-hash menjadi challenge yang tersimpan, dibandingkan dalam constant time.",
       }}
     />
 
-    Where the check bites. A code with a challenge is only redeemed when the verifier fits, whatever mode the request used.
+    Tempat pengecekan itu bekerja. Code yang punya challenge hanya bisa ditukar kalau verifier-nya cocok, apa pun mode request-nya.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/store.go#L178-L182"
       ts="labs/03-oauth-pkce/ts/src/store.ts#L105-L107"
       notes={{
-        180: "A challenge was stored: the matching verifier is required, or invalid_grant.",
-        107: "A challenge was stored: the matching verifier is required, or invalid_grant.",
+        180: "Challenge tersimpan: verifier yang cocok wajib ada, atau invalid_grant.",
+        107: "Challenge tersimpan: verifier yang cocok wajib ada, atau invalid_grant.",
       }}
     />
 
-    The attacker helper. It is the malicious app: the code and the redirect URI, an empty verifier. It exists only when the request carries `X-Lab-Mode: vulnerable`.
+    Attacker helper. Dialah app jahat itu: code dan redirect URI, dengan verifier kosong. Dia hanya ada kalau request membawa `X-Lab-Mode: vulnerable`.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/as.go#L470-L489"
       ts="labs/03-oauth-pkce/ts/src/as.ts#L247-L262"
       notes={{
-        473: "404 unless the request opted into vulnerable mode.",
-        488: "The same exchange as the real app, but with no verifier.",
-        252: "404 unless the request opted into vulnerable mode.",
-        261: "The same exchange as the real app, but with no verifier.",
+        473: "404 kecuali request memilih vulnerable mode.",
+        488: "Penukaran yang sama seperti app asli, tapi tanpa verifier.",
+        252: "404 kecuali request memilih vulnerable mode.",
+        261: "Penukaran yang sama seperti app asli, tapi tanpa verifier.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "PKCE binds an authorization code to the client instance that asked for it, with a fresh secret per request.",
-        "code_challenge = BASE64URL(SHA-256(code_verifier)) goes to /authorize. The verifier goes to /token.",
-        "A stolen code is useless without the verifier, and a failed guess does not burn the real client's code.",
-        "Use S256, never plain. Enforce PKCE on the server so it cannot be stripped.",
-        "OAuth 2.1 requires PKCE for every client using the code flow. RFC 9700 does so for public clients.",
+        "PKCE mengikat authorization code ke instance client yang memintanya, dengan secret baru di setiap request.",
+        "code_challenge = BASE64URL(SHA-256(code_verifier)) dikirim ke /authorize. Verifier dikirim ke /token.",
+        "Code curian nggak berguna tanpa verifier, dan tebakan yang gagal nggak menghanguskan code milik client asli.",
+        "Pakai S256, jangan pernah plain. Tegakkan PKCE di server supaya nggak bisa dibuang.",
+        "OAuth 2.1 mewajibkan PKCE untuk setiap client yang memakai code flow. RFC 9700 mewajibkannya untuk public client.",
       ]}
       interview={[
         {
-          q: "What problem does PKCE solve?",
-          a: "Authorization code interception and injection. Without it, anyone who obtains the code, such as a malicious app that registered the same custom URL scheme, can redeem it. PKCE ties the code to a secret only the original client knows.",
+          q: "Masalah apa yang diselesaikan PKCE?",
+          a: "Authorization code interception dan injection. Tanpa PKCE, siapa pun yang mendapat code, misalnya app jahat yang mendaftarkan custom URL scheme yang sama, bisa menukarnya. PKCE mengikat code ke secret yang hanya diketahui client asli.",
         },
         {
-          q: "Describe the PKCE exchange step by step.",
-          a: "The client makes a random code_verifier and computes code_challenge as base64url of SHA-256 of it. It sends the challenge and the method S256 to /authorize, and the server stores the challenge with the code. At /token the client sends the verifier, the server hashes it and compares it with the stored challenge, and issues tokens only on a match.",
+          q: "Jelaskan pertukaran PKCE langkah demi langkah.",
+          a: "Client membuat code_verifier acak dan menghitung code_challenge sebagai base64url dari SHA-256-nya. Dia mengirim challenge dan metode S256 ke /authorize, dan server menyimpan challenge bersama code. Di /token client mengirim verifier, server meng-hash-nya dan membandingkannya dengan challenge tersimpan, dan hanya menerbitkan token kalau cocok.",
         },
         {
-          q: "Why S256 and not plain?",
-          a: "With plain, the challenge is the verifier, so anyone who can see the authorization request, the same exposure PKCE addresses, can redeem the code. S256 sends only a one-way hash.",
+          q: "Kenapa S256 dan bukan plain?",
+          a: "Dengan plain, challenge adalah verifier, jadi siapa pun yang bisa melihat authorization request, paparan yang sama dengan yang ditangani PKCE, bisa menukar code. S256 hanya mengirim hash satu arah.",
         },
         {
-          q: "Do confidential clients still need PKCE?",
-          a: "RFC 9700 recommends it for all clients, and OAuth 2.1 requires it for the authorization code flow. It protects against code injection even when the client authenticates, and it is cheap.",
+          q: "Apakah confidential client masih butuh PKCE?",
+          a: "RFC 9700 merekomendasikannya untuk semua client, dan OAuth 2.1 mewajibkannya untuk authorization code flow. Dia melindungi dari code injection bahkan saat client mengautentikasi, dan murah.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain how PKCE stops the interception attack you just ran, and why the secure flow failed even though the attacker had the same code."
+      prompt="Jelaskan bagaimana PKCE menghentikan interception attack yang baru kamu jalankan, dan kenapa secure flow gagal padahal attacker punya code yang sama."
       rubric={[
-        "The code was issued together with a challenge that the server stored",
-        "Only the real client holds the verifier, which hashes to that challenge",
-        "The attacker saw the code and redirect URI but could not produce a matching verifier",
-        "SHA-256 is one-way, so the challenge in the URL reveals nothing",
+        "Code diterbitkan bersama challenge yang disimpan server",
+        "Hanya client asli yang memegang verifier, yang di-hash menjadi challenge itu",
+        "Attacker melihat code dan redirect URI tapi nggak bisa membuat verifier yang cocok",
+        "SHA-256 itu satu arah, jadi challenge di URL nggak membocorkan apa-apa",
       ]}
     />
   </Step>

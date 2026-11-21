@@ -2,102 +2,102 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    You type a password, the page changes, and the app greets you by name. Two separate questions were just answered, and mixing them up is behind a large share of real-world breaches.
+    Kamu ketik password, halaman berganti, dan app menyapa kamu pakai nama. Di balik itu ada dua pertanyaan terpisah yang baru saja dijawab, dan tertukarnya dua hal ini jadi penyebab banyak kebocoran di dunia nyata.
 
-    <Analogy title="The hotel">
-      At check-in the desk checks your passport and decides you really are Sam: that is authentication. Your key card then opens only the floors Sam booked: that is authorization.
+    <Analogy title="Hotel">
+      Waktu check-in, resepsionis cek KTP kamu dan memastikan kamu memang Sam: itu **authentication**. Setelah itu kartu kamar kamu cuma bisa buka lantai yang dipesan Sam: itu **authorization**.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Three words get blurred together, so pin them down.
+  <Step id="concept" title="Konsep">
+    Tiga istilah ini sering dicampur aduk, jadi kita bedakan dulu.
 
-    - **Identity** is the account the system believes you are acting as.
-    - **Authentication** (authn) is the proof that the caller owns that identity: a password, a passkey, a code.
-    - **Authorization** (authz) is the decision about what that identity may do, made again on every request.
+    - **Identity** adalah akun yang dianggap sistem sedang kamu pakai.
+    - **Authentication** (authn) adalah bukti bahwa pemanggil memang pemilik identity itu: password, passkey, atau kode.
+    - **Authorization** (authz) adalah keputusan soal apa yang boleh dilakukan identity itu, dan dicek lagi di setiap request.
 
-    Here is the whole round trip. Step through it, and click an arrow with a dotted label to read the raw message.
+    Ini gambaran satu putaran lengkapnya. Jalankan langkah demi langkah, dan klik panah yang punya label bertitik-titik buat lihat pesan mentahnya.
 
     <SequenceFlow flow={flows.whoIsWho} />
 
-    Authentication happens once per login. Authorization happens on every request, because roles change and every resource has a different owner.
+    Authentication terjadi sekali per login. Authorization terjadi di setiap request, karena role bisa berubah dan tiap resource punya pemilik yang beda.
 
     | | Authentication | Authorization |
     |---|---|---|
-    | Question | Who are you? | May you do this? |
-    | Input | Password, passkey, code | Identity plus a rule or policy |
-    | Frequency | At login | Every request |
-    | Failure | `401 Unauthorized` | `403 Forbidden` |
+    | Pertanyaan | Kamu siapa? | Kamu boleh melakukan ini? |
+    | Input | Password, passkey, kode | Identity plus aturan atau policy |
+    | Frekuensi | Saat login | Setiap request |
+    | Kegagalan | `401 Unauthorized` | `403 Forbidden` |
 
     <Callout type="security">
-      A 401 means "I do not know who you are". A 403 means "I know who you are, and the answer is no". Returning the wrong one hides bugs and leaks information.
+      401 artinya "aku nggak tahu kamu siapa". 403 artinya "aku tahu kamu siapa, dan jawabannya tidak". Salah pilih salah satunya menyembunyikan bug dan membocorkan informasi.
     </Callout>
 
     <Callout type="info">
-      Worth asking in your own SSO setup: which component answers "who is this?" (your **sso-backend**?), and where does each platform (or `core-api`) decide what that person may do? A valid SSO login should never mean "allowed everywhere".
+      Coba tanya di setup SSO kamu sendiri: komponen mana yang menjawab "ini siapa?" (apakah **sso-backend**?), dan di mana tiap platform (atau `core-api`) memutuskan apa yang boleh dilakukan orang itu? Login SSO yang valid jangan pernah berarti "boleh di mana saja".
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
-  <Step id="code" title="Code">
-    The lab has no roles, but it still shows both checks in order. First, **authentication**: find the live session behind the cookie, or answer `401`.
+  <Step id="code" title="Kode">
+    Lab ini belum punya role, tapi tetap menunjukkan kedua pengecekan itu berurutan. Pertama, **authentication**: cari session yang masih hidup di balik cookie, atau balas `401`.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L231-L246"
       ts="labs/01-sessions/ts/src/app.ts#L145-L154"
       notes={{
-        244: "No valid session: the server does not know who is calling, so 401.",
-        153: "Same rule in TypeScript: no session means 401.",
+        244: "Tidak ada session valid: server tidak tahu siapa yang memanggil, jadi 401.",
+        153: "Aturan yang sama di TypeScript: tanpa session berarti 401.",
       }}
     />
 
-    Then a second check that can still say no to a **known** caller. `/transfer` finds the session first (a signed-in user passes), then refuses the request with `403` unless it carries the right secret. A role check in your own app has this exact shape: known user, then a policy, then 403.
+    Lalu pengecekan kedua yang masih bisa bilang tidak ke pemanggil yang **sudah dikenal**. `/transfer` mencari session dulu (user yang sudah login lolos), baru menolak request dengan `403` kecuali request itu membawa secret yang benar. Pengecekan role di app kamu bentuknya persis begini: user dikenal, lalu policy, lalu 403.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L272-L280"
       ts="labs/01-sessions/ts/src/app.ts#L165-L169"
       notes={{
-        277: "A known user, refused: 403, not 401.",
-        169: "The same refusal in TypeScript.",
+        277: "User dikenal tapi ditolak: 403, bukan 401.",
+        169: "Penolakan yang sama di TypeScript.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Authentication proves who you are. Authorization decides what you may do.",
-        "Authenticate once per login, authorize on every request.",
-        "401 means unauthenticated, 403 means authenticated but not allowed.",
-        "Being logged in is never a permission by itself.",
+        "Authentication membuktikan kamu siapa. Authorization menentukan apa yang boleh kamu lakukan.",
+        "Authenticate sekali per login, authorize di setiap request.",
+        "401 artinya belum terautentikasi, 403 artinya sudah terautentikasi tapi tidak diizinkan.",
+        "Sudah login tidak pernah otomatis berarti punya izin.",
       ]}
       interview={[
         {
-          q: "What is the difference between authentication and authorization?",
-          a: "Authentication verifies the caller's identity. Authorization checks that identity against a policy for the resource being requested. They run at different times and fail with different status codes.",
+          q: "Apa beda authentication dan authorization?",
+          a: "Authentication memverifikasi identity pemanggil. Authorization mencocokkan identity itu dengan policy untuk resource yang diminta. Keduanya jalan di waktu yang berbeda dan gagal dengan status code yang berbeda.",
         },
         {
-          q: "When do you return 401 and when 403?",
-          a: "401 when the request has no valid credentials, so the server does not know who is asking. 403 when the caller is known but the policy denies the action.",
+          q: "Kapan kamu return 401 dan kapan 403?",
+          a: "401 kalau request tidak punya credentials yang valid, jadi server tidak tahu siapa yang meminta. 403 kalau pemanggil sudah dikenal tapi policy menolak aksinya.",
         },
         {
-          q: "A user is logged in. Why can you still not trust a role value sent by the browser?",
-          a: "Authentication only established who they are. Permissions must come from the server's own data on every request, never from a field the client controls.",
+          q: "User sudah login. Kenapa kamu tetap tidak boleh percaya nilai role yang dikirim browser?",
+          a: "Authentication cuma menetapkan siapa dia. Permission harus berasal dari data milik server sendiri di setiap request, bukan dari field yang bisa dikontrol client.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why a logged-in user can still get a 403."
+      prompt="Jelaskan ke teman satu tim kenapa user yang sudah login tetap bisa kena 403."
       rubric={[
-        "Logging in only proves identity",
-        "Each request is checked against permissions for that resource",
-        "403 means known user, not allowed",
+        "Login cuma membuktikan identity",
+        "Setiap request dicek terhadap permission untuk resource itu",
+        "403 artinya user dikenal, tapi tidak diizinkan",
       ]}
     />
   </Step>

@@ -11,14 +11,14 @@ import { OfflineCard } from "./OfflineCard";
 import { RFC_CHALLENGE, authorizeEntries, authorizeUrl, clientBase, randomVerifier, useBootRandom } from "./oauth";
 
 const WHY: Record<string, string> = {
-  response_type: "code asks for the authorization code flow.",
-  client_id: "Which registered client is asking. The lab knows demo-spa.",
-  redirect_uri: "Where the browser returns with the code. It must equal a registered URI exactly. Percent-encoded here.",
-  scope: "What access is requested, space separated. A space is %20 in a URL.",
-  state: "An unguessable value the client checks on return, to tie the response to its own request.",
-  code_challenge: "BASE64URL(SHA-256(verifier)). The verifier itself stays with the client.",
-  code_challenge_method: "S256 is the only method the lab accepts. plain would send the secret in the clear.",
-  lab_mode: "Lab only: asks the authorization server to behave in its deliberately weak way. A browser navigation cannot add the X-Lab-Mode header, so it travels in the query.",
+  response_type: "code berarti minta flow authorization code.",
+  client_id: "Client terdaftar mana yang meminta. Lab-nya kenal demo-spa.",
+  redirect_uri: "Ke mana browser kembali membawa code. Harus sama persis dengan URI terdaftar. Di sini di-percent-encode.",
+  scope: "Akses apa yang diminta, dipisah spasi. Spasi jadi %20 di URL.",
+  state: "Nilai yang nggak bisa ditebak, dicek client saat kembali, buat mengikat response ke request-nya sendiri.",
+  code_challenge: "BASE64URL(SHA-256(verifier)). Verifier-nya sendiri tetap di client.",
+  code_challenge_method: "S256 satu-satunya method yang diterima lab. plain bakal ngirim secret-nya apa adanya.",
+  lab_mode: "Khusus lab: minta authorization server berperilaku lemah dengan sengaja. Navigasi browser nggak bisa menambah header X-Lab-Mode, jadi dikirim lewat query.",
 };
 
 const EVIL = "/callback.evil";
@@ -45,7 +45,7 @@ export function OAuthUrlBuilder({ attack = false }: { attack?: boolean }) {
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Authorization request builder</h3>
+        <h3 className="text-sm font-semibold">Builder authorization request</h3>
         <LabSwitcher />
       </div>
 
@@ -66,16 +66,16 @@ export function OAuthUrlBuilder({ attack = false }: { attack?: boolean }) {
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={vulnerable} onChange={(e) => setVulnerable(e.target.checked)} />
-          Vulnerable mode (lab_mode=vulnerable)
+          Mode vulnerable (lab_mode=vulnerable)
         </label>
-        <Button variant="outline" size="xs" onClick={() => setRedirect(`${clientBase(impl)}${EVIL}`)}>Use the {EVIL} redirect</Button>
+        <Button variant="outline" size="xs" onClick={() => setRedirect(`${clientBase(impl)}${EVIL}`)}>Pakai redirect {EVIL}</Button>
         <Button variant="outline" size="xs" onClick={() => setRedirect(null)}>Reset redirect</Button>
       </div>
 
       <div className="space-y-2">
         <p className="text-xs font-medium">URL</p>
-        <output aria-label="Authorize URL" className="block rounded border bg-muted/30 p-2 font-mono text-xs break-all">{url}</output>
-        <ul aria-label="Annotations" className="space-y-1 text-xs">
+        <output aria-label="URL authorize" className="block rounded border bg-muted/30 p-2 font-mono text-xs break-all">{url}</output>
+        <ul aria-label="Anotasi" className="space-y-1 text-xs">
           {authorizeEntries(params).map(([k, v]) => (
             <li key={k}>
               <span className="font-mono font-semibold">{k}</span>
@@ -84,9 +84,9 @@ export function OAuthUrlBuilder({ attack = false }: { attack?: boolean }) {
             </li>
           ))}
         </ul>
-        {!fields.code_challenge && !vulnerable && <p className="text-xs text-warning">No code_challenge: the secure server will answer with error=invalid_request.</p>}
-        <Button size="sm" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}>Open in a new tab</Button>
-        <p className="text-xs text-muted-foreground">Sign in as alice@example.com / correct-horse-battery. The browser returns to the redirect_uri, so the client SPA there will not recognise a request it did not start. That is expected.</p>
+        {!fields.code_challenge && !vulnerable && <p className="text-xs text-warning">Tanpa code_challenge: secure server bakal menjawab error=invalid_request.</p>}
+        <Button size="sm" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}>Buka di tab baru</Button>
+        <p className="text-xs text-muted-foreground">Login sebagai alice@example.com / correct-horse-battery. Browser kembali ke redirect_uri, jadi client SPA di sana nggak akan mengenali request yang bukan dia yang mulai. Itu normal.</p>
       </div>
 
       {attack && <RedirectAttack impl={impl} />}
@@ -131,40 +131,40 @@ function RedirectAttack({ impl }: { impl: Impl }) {
   };
 
   return (
-    <section aria-label="Redirect prefix attack" className="space-y-3 rounded-md border bg-muted/30 p-3">
+    <section aria-label="Attack redirect prefix" className="space-y-3 rounded-md border bg-muted/30 p-3">
       <div className="space-y-1">
-        <p className="text-sm font-semibold">Redirect prefix attack</p>
+        <p className="text-sm font-semibold">Attack redirect prefix</p>
         <p className="text-xs text-muted-foreground">
-          The registered redirect_uri is {clientBase(impl)}/callback. The attacker asks for {clientBase(impl)}{EVIL}, which merely starts with it. The same request goes to the secure server (exact match) and to the vulnerable one (prefix match).
+          redirect_uri yang terdaftar adalah {clientBase(impl)}/callback. Attacker meminta {clientBase(impl)}{EVIL}, yang cuma kebetulan diawali itu. Request yang sama dikirim ke secure server (exact match) dan ke vulnerable server (prefix match).
         </p>
       </div>
       {offline && <OfflineCard lab="03" impl={impl} retrying={false} />}
       {(seen.secure !== undefined || seen.vulnerable !== undefined) && (
         <div className="grid gap-3 sm:grid-cols-2">
           {([
-            ["Secure server", seen.secure, 400, "Rejected with an error page. There is no redirect, so the code can never be sent to the attacker's URL."],
-            ["Vulnerable server", seen.vulnerable, 200, "Accepted: it shows the sign-in page. After approval it would redirect the code to the attacker's URL."],
+            ["Secure server", seen.secure, 400, "Ditolak dengan halaman error. Nggak ada redirect, jadi code nggak pernah terkirim ke URL attacker."],
+            ["Vulnerable server", seen.vulnerable, 200, "Diterima: menampilkan halaman login. Setelah disetujui, code bakal di-redirect ke URL attacker."],
           ] as const).map(([label, status, wanted, why]) => (
             <div key={label} aria-live="polite" className="space-y-1 rounded border bg-background p-2">
               <p className="font-mono text-xs text-muted-foreground">{label}: GET /authorize</p>
               {status === undefined ? (
-                <p className="text-xs text-muted-foreground">waiting…</p>
+                <p className="text-xs text-muted-foreground">menunggu…</p>
               ) : (
                 <>
                   <p className={`font-mono text-2xl font-semibold tabular-nums ${status === 200 ? "text-destructive" : "text-success"}`}>{status}</p>
-                  <p className="text-xs">{status === wanted ? why : "Unexpected for this attack."}</p>
+                  <p className="text-xs">{status === wanted ? why : "Di luar dugaan untuk attack ini."}</p>
                 </>
               )}
             </div>
           ))}
         </div>
       )}
-      {seen.vulnerable !== undefined && !expected && <p className="text-xs">Not the expected 400 and 200. Check that the lab is in its default state and run again.</p>}
-      <Button variant="outline" size="sm" disabled={running} onClick={() => void go()}>Run redirect attack</Button>
+      {seen.vulnerable !== undefined && !expected && <p className="text-xs">Bukan 400 dan 200 seperti yang diharapkan. Pastikan lab dalam kondisi default lalu jalankan lagi.</p>}
+      <Button variant="outline" size="sm" disabled={running} onClick={() => void go()}>Jalankan attack redirect</Button>
       {awaitingLogin && (
         <div className="flex items-center gap-2">
-          <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
-          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Sign in again</Button>
+          <p role="status" className="text-sm text-muted-foreground">Login lagi buat nyimpen progress kamu.</p>
+          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Login lagi</Button>
         </div>
       )}
     </section>

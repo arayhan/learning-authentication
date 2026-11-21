@@ -8,18 +8,18 @@ const lesson: LessonMeta = {
   minutes: 25,
   steps: [
     { id: "hook", title: "Hook" },
-    { id: "concept", title: "Concept" },
-    { id: "check", title: "Check" },
+    { id: "concept", title: "Konsep" },
+    { id: "check", title: "Cek" },
     { id: "lab", title: "Lab" },
-    { id: "code", title: "Code" },
-    { id: "recap", title: "Recap" },
+    { id: "code", title: "Kode" },
+    { id: "recap", title: "Rangkuman" },
   ],
   quizzes: [
     {
       id: "q1",
       questions: [
         {
-          prompt: "Which grant fits a nightly backend job that reads data when no user is present?",
+          prompt: "Grant mana yang cocok untuk job backend malam hari yang membaca data saat tidak ada user?",
           choices: [
             "Client credentials",
             "Authorization code with PKCE",
@@ -27,29 +27,29 @@ const lesson: LessonMeta = {
             "Resource owner password credentials",
           ],
           answer: 0,
-          why: "Client credentials (RFC 6749 section 4.4) lets a confidential client get a token for itself using its own secret, with no browser and no consent. The authorization code flow needs a user at a browser, and the implicit and password grants are gone from OAuth 2.1.",
+          why: "Client credentials (RFC 6749 section 4.4) membuat confidential client bisa mendapat token untuk dirinya sendiri memakai secret-nya, tanpa browser dan tanpa consent. Authorization code flow butuh user di browser, dan grant implicit serta password sudah dihapus dari OAuth 2.1.",
         },
         {
-          prompt: "RFC 6749 says a client credentials response should not include a refresh token. Why?",
+          prompt: "RFC 6749 bilang response client credentials sebaiknya tidak menyertakan refresh token. Kenapa?",
           choices: [
-            "Refresh tokens cannot be sent with HTTP Basic authentication",
-            "The client can authenticate again at any moment, so a long-lived refresh token adds risk and no convenience",
-            "Access tokens from this grant never expire",
-            "Refresh tokens only work for JWT access tokens",
+            "Refresh token nggak bisa dikirim dengan HTTP Basic authentication",
+            "Client bisa mengautentikasi lagi kapan saja, jadi refresh token berumur panjang menambah risiko tanpa kemudahan",
+            "Access token dari grant ini nggak pernah kedaluwarsa",
+            "Refresh token hanya jalan untuk access token JWT",
           ],
           answer: 1,
-          why: "A refresh token exists so a user does not have to sign in again. Here there is no user: the client simply repeats the request with its secret when the access token expires. An extra long-lived credential would only be one more thing to steal.",
+          why: "Refresh token ada supaya user nggak perlu login lagi. Di sini nggak ada user: client tinggal mengulang request dengan secret-nya saat access token kedaluwarsa. Credential tambahan berumur panjang cuma jadi satu hal lagi yang bisa dicuri.",
         },
         {
-          prompt: "A service wants alice's photos using only client credentials. What is the problem?",
+          prompt: "Sebuah service mau mengambil foto alice hanya dengan client credentials. Apa masalahnya?",
           choices: [
-            "The token would be rejected by every API",
-            "Client credentials only works over HTTP, not HTTPS",
-            "The photos would arrive without scopes",
-            "The token identifies the client itself (its sub is the client id), not alice, so it cannot stand for her. User data needs a flow where she consents",
+            "Token akan ditolak oleh semua API",
+            "Client credentials hanya jalan lewat HTTP, bukan HTTPS",
+            "Fotonya akan datang tanpa scope",
+            "Token mengidentifikasi client itu sendiri (sub-nya adalah client id), bukan alice, jadi nggak bisa mewakilinya. Data user butuh flow di mana dia memberi consent",
           ],
           answer: 3,
-          why: "With client credentials there is no resource owner. The token says what the client may do as itself. If an API treated such a token as a user's, any backend with a secret could read any user's data. Use the authorization code flow when the user is the point.",
+          why: "Dengan client credentials nggak ada resource owner. Token bilang apa yang boleh dilakukan client sebagai dirinya sendiri. Kalau API memperlakukan token seperti itu sebagai token user, backend mana pun yang punya secret bisa membaca data user mana pun. Pakai authorization code flow kalau user-nya yang jadi intinya.",
         },
       ],
     },
@@ -57,9 +57,9 @@ const lesson: LessonMeta = {
   labTasks: [
     {
       id: "client-credentials-200",
-      label: "Get a token for the backend client (POST /token with grant_type=client_credentials returns 200)",
+      label: "Ambil token untuk backend client (POST /token dengan grant_type=client_credentials mengembalikan 200)",
       lab: "03",
-      hint: "Click Get a token in the console. It sends demo-backend's id and secret as HTTP Basic.",
+      hint: "Klik Ambil token di console. Dia mengirim id dan secret milik demo-backend lewat HTTP Basic.",
       match: (e) => e.role === "as" && e.req.method === "POST" && e.req.path === "/token" && e.res.status === 200 && (e.req.body ?? "").includes("grant_type=client_credentials") && (e.res.body ?? "").includes("access_token"),
     },
   ],

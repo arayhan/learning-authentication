@@ -2,66 +2,66 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    A session is only as safe as the moments you create it, change it and destroy it. Most real session bugs are not in the cookie flags. They are in the timing.
+    Session cuma seaman momen saat kamu membuatnya, mengubahnya, dan menghancurkannya. Kebanyakan bug session di dunia nyata bukan di flag cookie. Bug-nya ada di timing.
 
-    <Analogy title="New locks on move-in day">
-      When you move into a flat you change the locks, because you cannot know who kept a copy of the old key. A session id is a key, and logging in is move-in day: the server should hand you a new one.
+    <Analogy title="Ganti kunci pas pindah kos">
+      Pas pindah ke kos baru, kamu minta ganti kunci, karena nggak tahu siapa saja yang masih pegang duplikat kunci lama. Session id itu kunci, dan login adalah hari pindahan: server harus memberi kamu yang baru.
     </Analogy>
   </Step>
 
-  <Step id="lifecycle" title="Birth to death">
-    A session has a life, and each stage has a rule.
+  <Step id="lifecycle" title="Dari lahir sampai mati">
+    Session punya masa hidup, dan tiap tahap punya aturan.
 
-    | Stage | Rule |
+    | Tahap | Aturan |
     |---|---|
-    | Create | After authentication, with a fresh random id |
-    | Use | Look the id up on every request; check the expiry in the database |
-    | Rotate | New id at login and at every privilege change: password change, MFA step-up, role change |
-    | Expire | An **idle** timeout and an **absolute** timeout, enforced on the server |
-    | Destroy | Logout deletes the server-side record, then clears the cookie |
+    | Create | Setelah authentication, dengan id acak yang baru |
+    | Use | Cari id di setiap request; cek expiry di database |
+    | Rotate | Id baru saat login dan di setiap perubahan privilege: ganti password, MFA step-up, ganti role |
+    | Expire | Timeout **idle** dan timeout **absolute**, ditegakkan di server |
+    | Destroy | Logout menghapus catatan di sisi server, lalu membersihkan cookie |
 
-    **Idle** timeout ends a session after a period without use. **Absolute** timeout ends it no matter what, so a stolen session cannot live forever. OWASP's Session Management cheat sheet suggests 2 to 5 minutes idle for high-value apps and 15 to 30 minutes for low-risk ones, and you pick the absolute limit from your risk.
+    Timeout **idle** mengakhiri session setelah sekian lama tidak dipakai. Timeout **absolute** mengakhirinya apa pun yang terjadi, supaya session curian tidak hidup selamanya. Session Management cheat sheet OWASP menyarankan idle 2 sampai 5 menit untuk app bernilai tinggi dan 15 sampai 30 menit untuk yang berisiko rendah, dan batas absolute kamu tentukan dari risikonya.
 
-    The lab keeps it small: one hour, absolute, stored in the database as `expires_at`. The cookie's `Max-Age` is only a hint to the browser. The server never trusts it.
+    Lab ini dibuat sederhana: satu jam, absolute, disimpan di database sebagai `expires_at`. `Max-Age` di cookie hanya petunjuk untuk browser. Server tidak pernah mempercayainya.
 
     <Callout type="security">
-      Changing a password should also **destroy every other session** of that user and give the current device a new one. If the reason for the change is "someone else had my password", their sessions must die too.
+      Ganti password juga harus **menghancurkan semua session lain** milik user itu dan memberi perangkat yang sedang dipakai session baru. Kalau alasan ganti password adalah "ada orang lain yang pegang passwordku", session mereka juga harus mati.
     </Callout>
   </Step>
 
-  <Step id="rotation" title="Rotate on login">
-    Here is the secure login, step by step. The server deletes whatever id the client arrived with, creates a new one, and sets it.
+  <Step id="rotation" title="Rotate saat login">
+    Ini login yang aman, langkah demi langkah. Server menghapus id apa pun yang dibawa client, membuat yang baru, dan mengaturnya.
 
     <SequenceFlow flow={flows.sessionRotation} />
 
-    Why bother? Because the id the browser held **before** login was created while nobody was authenticated, and nobody protected it. Anyone who knew it would be handed a logged-in session for free, if login simply kept it. Rotation closes that door.
+    Kenapa repot? Karena id yang dipegang browser **sebelum** login dibuat saat belum ada yang terautentikasi, dan tidak ada yang melindunginya. Siapa pun yang tahu id itu akan dapat session yang sudah login secara gratis, kalau login cuma mempertahankannya. Rotation menutup celah itu.
   </Step>
 
   <Step id="session-fixation" title="Session fixation">
-    **Session fixation** is the attack that rotation exists to stop. It turns the usual theft around: the attacker does not steal the victim's id, they **choose** it.
+    **Session fixation** adalah serangan yang ingin dihentikan oleh rotation. Ia membalik pencurian biasa: attacker tidak mencuri id korban, ia **memilihnya**.
 
-    1. The attacker obtains or invents a session id.
-    2. They get it into the victim's browser. Real routes: a session id accepted from the URL, a cookie planted from a sibling subdomain or by an XSS bug, or a network attacker on plain HTTP.
-    3. The victim logs in. A vulnerable server keeps the id and attaches the victim's account to it.
-    4. The attacker sends requests with the id they always knew.
+    1. Attacker mendapatkan atau mengarang session id.
+    2. Ia memasukkannya ke browser korban. Jalurnya nyata: session id yang diterima dari URL, cookie yang ditanam dari subdomain tetangga atau lewat bug XSS, atau attacker di jaringan lewat HTTP biasa.
+    3. Korban login. Server yang rentan mempertahankan id itu dan menempelkan akun korban ke sana.
+    4. Attacker mengirim request dengan id yang sudah ia tahu dari awal.
 
     <SequenceFlow flow={flows.fixation} />
 
-    The fixes are simple and cheap:
+    Perbaikannya sederhana dan murah:
 
-    - **Always issue a new id at login** and delete the old one.
-    - **Never accept a session id the server did not issue.**
-    - Keep ids out of URLs, and use `Secure` and `HttpOnly` cookies.
+    - **Selalu terbitkan id baru saat login** dan hapus yang lama.
+    - **Jangan pernah menerima session id yang tidak diterbitkan server.**
+    - Jauhkan id dari URL, dan pakai cookie `Secure` dan `HttpOnly`.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Log in, use the session, then log out and prove the session is really gone.
+    Log in, pakai session-nya, lalu log out dan buktikan session-nya benar-benar hilang.
 
     <LabTasks />
 
@@ -76,112 +76,112 @@ import { flows } from "@/content/flows";
       ]}
     />
 
-    Two things to notice:
+    Dua hal yang perlu diperhatikan:
 
-    - **Log out** needs the CSRF token from your login response, because logging someone out is a state change too. The console fills it in from the last login. Without a token you would get `403`.
-    - After logging out, **Whoami again** returns `401`. The server deleted the session, so even a copied cookie is dead.
+    - **Log out** butuh CSRF token dari response login kamu, karena logout orang juga perubahan state. Console mengisinya dari login terakhir. Tanpa token kamu akan dapat `403`.
+    - Setelah logout, **Whoami again** mengembalikan `401`. Server sudah menghapus session-nya, jadi cookie yang disalin pun sudah mati.
 
-    Try **Log in** twice in a row and watch the `sid` change in the Inspector's Cookies tab. That is rotation.
+    Coba **Log in** dua kali berturut-turut dan lihat `sid` berubah di tab Cookies Inspector. Itulah rotation.
   </Step>
 
-  <Step id="code" title="Code">
-    The login handler after the password check passes. It reads the incoming `sid`, deletes that session, creates a new one and sets the cookie.
+  <Step id="code" title="Kode">
+    Login handler setelah pengecekan password lolos. Ia membaca `sid` yang masuk, menghapus session itu, membuat yang baru, dan mengatur cookie-nya.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L208-L229"
       ts="labs/01-sessions/ts/src/app.ts#L132-L142"
       notes={{
-        214: "The vulnerable branch: with the X-Lab-Mode header the incoming id is kept. We will exploit it in a moment.",
-        217: "The secure branch: delete whatever session the client presented.",
-        227: "A new, random id goes out in Set-Cookie.",
-        134: "The vulnerable branch, in TypeScript.",
-        137: "Secure: delete the session named by the incoming cookie.",
-        141: "Set-Cookie with the new id.",
+        214: "Cabang yang rentan: dengan header X-Lab-Mode, id yang masuk dipertahankan. Sebentar lagi kita eksploitasi.",
+        217: "Cabang yang aman: hapus session apa pun yang dibawa client.",
+        227: "Id acak yang baru dikirim keluar lewat Set-Cookie.",
+        134: "Cabang yang rentan, di TypeScript.",
+        137: "Aman: hapus session yang ditunjuk cookie yang masuk.",
+        141: "Set-Cookie dengan id yang baru.",
       }}
     />
 
-    And logout, which requires the CSRF token, deletes the row and clears the cookie.
+    Dan logout, yang mewajibkan CSRF token, menghapus barisnya dan membersihkan cookie.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L254-L270"
       ts="labs/01-sessions/ts/src/app.ts#L156-L163"
       notes={{
-        259: "A constant-time comparison with the session's CSRF token.",
-        264: "The server-side record is deleted. This is the part that matters.",
-        268: "The cookie is expired (Max-Age=0 on the wire; Go's MaxAge: -1 is only how it asks for that), so the browser drops its copy too.",
-        159: "The same CSRF check before anything is deleted.",
-        160: "Delete the server-side session.",
-        161: "Clear the cookie.",
+        259: "Perbandingan constant-time dengan CSRF token milik session.",
+        264: "Catatan di sisi server dihapus. Bagian inilah yang penting.",
+        268: "Cookie dikedaluwarsakan (Max-Age=0 di wire; MaxAge: -1 di Go hanya cara meminta itu), jadi browser ikut membuang salinannya.",
+        159: "Pengecekan CSRF yang sama sebelum apa pun dihapus.",
+        160: "Hapus session di sisi server.",
+        161: "Bersihkan cookie-nya.",
       }}
     />
   </Step>
 
-  <Step id="breakit" title="Break it">
-    Time to exploit the very bug you just read. This runs the real fixation attack against the lab, twice: once with the vulnerable branch switched on, once secure.
+  <Step id="breakit" title="Coba bobol">
+    Saatnya mengeksploitasi bug yang barusan kamu baca. Ini menjalankan serangan fixation sungguhan ke lab, dua kali: sekali dengan cabang rentan dinyalakan, sekali yang aman.
 
-    Click **Run vulnerable**, then **Run secure**. The page registers a victim, **plants** a session id, has the victim log in, and finally has the attacker replay that id.
+    Klik **Run vulnerable**, lalu **Run secure**. Halaman akan mendaftarkan korban, **menanam** session id, membuat korban login, dan terakhir membuat attacker memutar ulang id itu.
 
     <FixationAttack />
 
-    You should see two different answers to the same attack:
+    Kamu akan melihat dua jawaban berbeda untuk serangan yang sama:
 
-    - **Vulnerable: 200.** The login kept the attacker's id, so `GET /me` with it returns the victim's email.
-    - **Secure: 401.** The login rotated the id and deleted the old one, so the planted id is worthless.
+    - **Vulnerable: 200.** Login mempertahankan id milik attacker, jadi `GET /me` dengan id itu mengembalikan email korban.
+    - **Secure: 401.** Login me-rotate id dan menghapus yang lama, jadi id yang ditanam tidak berguna.
 
-    Open the Inspector and read the requests of each run. The only difference between them is one header on one request.
+    Buka Inspector dan baca request tiap run. Satu-satunya perbedaan di antara keduanya adalah satu header di satu request.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L213-L221"
       ts="labs/01-sessions/ts/src/app.ts#L133-L138"
       notes={{
-        214: "VULNERABLE: the attacker-chosen id becomes the authenticated session.",
-        216: "Secure: remember the old id and delete it.",
-        134: "VULNERABLE: reuse the incoming id.",
-        136: "Secure: delete the incoming session.",
+        214: "RENTAN: id pilihan attacker menjadi session yang terautentikasi.",
+        216: "Aman: ingat id lama dan hapus.",
+        134: "RENTAN: pakai ulang id yang masuk.",
+        136: "Aman: hapus session yang masuk.",
       }}
     />
 
     <Callout type="info">
-      Browsers do not let a script set a cookie for another site. The lab's `/__attack/plant-sid` helper stands in for the real planting channel (an XSS bug, a sibling subdomain, a poisoned link), and it only exists when you send `X-Lab-Mode: vulnerable`.
+      Browser tidak mengizinkan script mengatur cookie untuk situs lain. Helper `/__attack/plant-sid` di lab menggantikan jalur penanaman yang asli (bug XSS, subdomain tetangga, link beracun), dan ia hanya ada kalau kamu mengirim `X-Lab-Mode: vulnerable`.
     </Callout>
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "A session has a lifecycle: create, use, rotate, expire, destroy, and the server enforces every stage.",
-        "Issue a new session id at login and at every privilege change, and delete the old one.",
-        "Session fixation: the attacker chooses the id and waits for the victim to log in under it.",
-        "Use an idle timeout plus an absolute timeout, both enforced on the server.",
-        "Logout must delete the server-side session, not just the cookie.",
+        "Session punya lifecycle: create, use, rotate, expire, destroy, dan server menegakkan setiap tahap.",
+        "Terbitkan session id baru saat login dan di setiap perubahan privilege, lalu hapus yang lama.",
+        "Session fixation: attacker memilih id dan menunggu korban login memakainya.",
+        "Pakai timeout idle plus timeout absolute, keduanya ditegakkan di server.",
+        "Logout harus menghapus session di sisi server, bukan cuma cookie-nya.",
       ]}
       interview={[
         {
-          q: "What is session fixation, and how do you prevent it?",
-          a: "The attacker plants a known session id in the victim's browser. If the server keeps that id after login, the attacker now holds an authenticated session. Prevent it by issuing a fresh id at login, deleting the old one, and never accepting ids the server did not generate.",
+          q: "Apa itu session fixation, dan gimana mencegahnya?",
+          a: "Attacker menanam session id yang sudah ia ketahui di browser korban. Kalau server mempertahankan id itu setelah login, attacker sekarang memegang session yang terautentikasi. Cegah dengan menerbitkan id baru saat login, menghapus yang lama, dan tidak pernah menerima id yang tidak dibuat server.",
         },
         {
-          q: "When should you regenerate the session id?",
-          a: "At login, and on any privilege or security-context change: password change, MFA step-up, role elevation. The old id must stop working.",
+          q: "Kapan kamu harus membuat ulang session id?",
+          a: "Saat login, dan di setiap perubahan privilege atau konteks keamanan: ganti password, MFA step-up, kenaikan role. Id lama harus berhenti berfungsi.",
         },
         {
-          q: "What is the difference between an idle and an absolute timeout?",
-          a: "Idle ends a session after inactivity. Absolute ends it after a fixed lifetime regardless of activity. Together they bound how long a stolen or forgotten session stays useful.",
+          q: "Apa beda timeout idle dan absolute?",
+          a: "Idle mengakhiri session setelah tidak ada aktivitas. Absolute mengakhirinya setelah masa hidup tetap, terlepas dari aktivitas. Bersama-sama keduanya membatasi berapa lama session curian atau yang terlupakan tetap berguna.",
         },
         {
-          q: "Why is clearing the cookie not a real logout?",
-          a: "Anyone who copied the cookie can still use it until the server forgets the session. A real logout deletes the server-side record.",
+          q: "Kenapa menghapus cookie bukan logout yang sebenarnya?",
+          a: "Siapa pun yang menyalin cookie tetap bisa memakainya sampai server melupakan session-nya. Logout yang benar menghapus catatan di sisi server.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Walk through a fixation attack, then explain which single server behavior makes it fail."
+      prompt="Jelaskan alur serangan fixation, lalu sebutkan satu perilaku server yang membuatnya gagal."
       rubric={[
-        "The attacker chooses the session id and plants it in the victim's browser",
-        "The victim authenticates under that id",
-        "A vulnerable server keeps the id, so the attacker's copy is now logged in",
-        "Issuing a new id at login (and deleting the old) makes the planted id worthless",
+        "Attacker memilih session id dan menanamnya di browser korban",
+        "Korban melakukan authentication dengan id itu",
+        "Server yang rentan mempertahankan id, jadi salinan attacker sekarang sudah login",
+        "Menerbitkan id baru saat login (dan menghapus yang lama) membuat id yang ditanam tidak berguna",
       ]}
     />
   </Step>

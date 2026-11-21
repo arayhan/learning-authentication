@@ -2,127 +2,127 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    In lesson 2 the client sent a code to `/token` and got a token back. A question was hiding in that step: how does the authorization server know the request really comes from the client it says it is?
+    Di lesson 2, client mengirim code ke `/token` dan dapat token. Ada satu pertanyaan yang tersembunyi di langkah itu: gimana authorization server tahu request itu benar-benar datang dari client yang diklaimnya?
 
-    The answer depends on what kind of program the client is. A server in a locked room can keep a password. An app that you download to a stranger's device cannot.
+    Jawabannya tergantung jenis program si client. Server di ruangan terkunci bisa menyimpan password. App yang di-download ke perangkat orang asing nggak bisa.
 
-    <Analogy title="The diary">
-      A diary kept in a locked drawer stays private, and a diary left open on a shared table does not. Code that runs on the user's device is the table: whatever you write in it, the user and anyone near them can read.
+    <Analogy title="Buku diary">
+      Diary yang disimpan di laci terkunci tetap privat, sedangkan diary yang dibiarkan terbuka di meja kantin nggak. Kode yang jalan di perangkat user itu mejanya: apa pun yang kamu tulis di situ bisa dibaca user dan siapa saja di dekatnya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    RFC 6749 section 2.1 sorts clients by one question: **can this client keep a credential confidential?**
+  <Step id="concept" title="Konsep">
+    RFC 6749 section 2.1 mengelompokkan client dengan satu pertanyaan: **bisakah client ini menjaga credential tetap rahasia?**
 
     | | **Confidential client** | **Public client** |
     |---|---|---|
-    | Can keep a secret | Yes | No |
-    | Examples | Server-rendered web app, backend service, a job | Single-page app, mobile app, desktop app |
-    | Authenticates at `/token` | With its secret or a key | It cannot, so it only sends its `client_id` |
-    | What protects its codes | The secret, and PKCE (recommended) | PKCE (required) |
-    | In the lab | `demo-backend` has the secret `lab-secret` | `demo-spa` has no secret |
+    | Bisa menyimpan secret | Ya | Tidak |
+    | Contoh | Web app server-rendered, backend service, sebuah job | Single-page app, mobile app, desktop app |
+    | Autentikasi di `/token` | Dengan secret atau key | Nggak bisa, jadi hanya mengirim `client_id` |
+    | Yang melindungi code-nya | Secret, dan PKCE (direkomendasikan) | PKCE (wajib) |
+    | Di lab | `demo-backend` punya secret `lab-secret` | `demo-spa` tanpa secret |
 
-    The lab registers both. The point of the table is the last row. A public client's `client_id` is not a secret, its redirect URI is in its own source, and its token request can be copied by anyone. If an attacker steals a code, nothing but PKCE stops them from redeeming it.
+    Lab mendaftarkan keduanya. Poin tabel ini ada di baris terakhir. `client_id` milik public client bukan rahasia, redirect URI-nya ada di source-nya sendiri, dan token request-nya bisa disalin siapa saja. Kalau attacker mencuri code, hanya PKCE yang mencegahnya menukar code itu.
 
     <Callout type="warn">
-      Do not make a SPA "confidential" by embedding a `client_secret` in its bundle. Everyone who loads the page has the secret, so it proves nothing, and it can give a false sense of safety. Treat browser and mobile apps as public clients.
+      Jangan menjadikan SPA "confidential" dengan menanam `client_secret` di bundle-nya. Semua orang yang membuka halaman punya secret itu, jadi dia nggak membuktikan apa-apa dan malah memberi rasa aman palsu. Perlakukan app browser dan mobile sebagai public client.
     </Callout>
 
-    A common alternative for browser apps is a **backend for frontend**: a small server that holds the tokens and the client secret, and talks to the browser with an ordinary session cookie. The browser then never sees an OAuth token. It trades the token handling problems of Module 2, lesson 4, for a stateful server.
+    Alternatif umum untuk app browser adalah **backend for frontend**: server kecil yang memegang token dan client secret, lalu bicara ke browser lewat session cookie biasa. Browser jadi nggak pernah melihat OAuth token. Tukarannya: masalah penanganan token di Modul 2, lesson 4, diganti dengan server yang stateful.
 
-    **Native apps** (phones, desktops) are public clients too. RFC 8252 asks them to sign in through the **system browser**, never an embedded web view, so the app cannot read the user's password. Lesson 4 shows what goes wrong with the redirect on a phone.
+    **Native app** (HP, desktop) juga public client. RFC 8252 meminta mereka login lewat **system browser**, bukan embedded web view, supaya app nggak bisa membaca password user. Lesson 4 menunjukkan apa yang bisa salah dengan redirect di HP.
   </Step>
 
-  <Step id="implicit" title="The implicit flow">
-    Before PKCE existed, browser apps used the **implicit flow** (RFC 6749 section 4.2): no code, no back channel. The authorization server returned the access token directly, in the URL fragment of the redirect. It was designed for the case "the browser cannot make a cross-origin request", which stopped being true once CORS arrived.
+  <Step id="implicit" title="Implicit flow">
+    Sebelum PKCE ada, app browser memakai **implicit flow** (RFC 6749 section 4.2): tanpa code, tanpa back channel. Authorization server mengembalikan access token langsung di URL fragment pada redirect. Dibuat untuk kasus "browser nggak bisa membuat cross-origin request", yang sudah nggak benar sejak CORS hadir.
 
     <SequenceFlow flow={flows.implicitDeprecated} />
 
-    Why it was retired (RFC 9700 and OAuth 2.1):
+    Kenapa dipensiunkan (RFC 9700 dan OAuth 2.1):
 
-    - **The token is in the URL.** It reaches browser history, extensions, scripts, shared screens and anything else that sees the address bar.
-    - **No binding.** Any party that gets the token can use it. There is no step where the client proves it is the one that asked.
-    - **No refresh tokens and no client authentication.** The flow has no back-channel step where either could happen.
+    - **Token ada di URL.** Dia masuk ke history browser, extension, script, layar yang di-share, dan apa pun yang bisa melihat address bar.
+    - **Nggak ada binding.** Pihak mana pun yang mendapat token bisa memakainya. Nggak ada langkah di mana client membuktikan dirinya yang tadi meminta.
+    - **Nggak ada refresh token dan client authentication.** Flow ini nggak punya langkah back channel tempat keduanya bisa terjadi.
 
-    The replacement is not a new flow. It is the one from lesson 2 with PKCE, which works for the same apps and keeps the token off the URL. You can ask the lab for the old flow and see it refuse (use the port of your selected implementation):
+    Penggantinya bukan flow baru. Penggantinya flow dari lesson 2 dengan PKCE, yang cocok untuk app yang sama dan menjaga token tetap di luar URL. Kamu bisa meminta flow lama ke lab dan melihat dia menolak (pakai port implementasi yang kamu pilih):
 
     ```bash
     curl -i "http://localhost:4103/authorize?response_type=token&client_id=demo-spa&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback&scope=photos.read&state=abc"
     ```
 
-    The answer is `302` to the callback with `error=unsupported_response_type`. The same reasoning removes the **resource owner password credentials** grant, where the app collects the password itself, which defeats the purpose of this whole module.
+    Jawabannya `302` ke callback dengan `error=unsupported_response_type`. Alasan yang sama juga menghapus grant **resource owner password credentials**, di mana app mengumpulkan password sendiri, yang menggagalkan tujuan seluruh modul ini.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
-  <Step id="code" title="Code">
-    The lab's two clients. The comment on `demo-spa` is the whole lesson: it has no secret.
+  <Step id="code" title="Kode">
+    Dua client di lab. Komentar pada `demo-spa` adalah inti pelajarannya: dia tidak punya secret.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/clients.go#L25-L39"
       ts="labs/03-oauth-pkce/ts/src/clients.ts#L13-L23"
       notes={{
-        26: "demo-spa has no Secret field: it is a public client, so PKCE is its protection.",
-        29: "Redirect URIs are registered ahead of time. They are compared exactly (lesson 5).",
-        35: "demo-backend is confidential: it has a secret and no redirect URIs, because it never uses a browser.",
-        14: "demo-spa has no secret: it is a public client, so PKCE is its protection.",
-        17: "Registered redirect URIs, compared exactly.",
-        22: "demo-backend is confidential: it has a secret and no redirect URIs.",
+        26: "demo-spa tidak punya field Secret: dia public client, jadi PKCE yang melindunginya.",
+        29: "Redirect URI didaftarkan di awal. Dibandingkan persis sama (lesson 5).",
+        35: "demo-backend itu confidential: punya secret dan tanpa redirect URI, karena dia nggak pernah memakai browser.",
+        14: "demo-spa tidak punya secret: dia public client, jadi PKCE yang melindunginya.",
+        17: "Redirect URI terdaftar, dibandingkan persis sama.",
+        22: "demo-backend itu confidential: punya secret dan tanpa redirect URI.",
       }}
     />
 
-    A confidential client's secret is checked in constant time. A public client can never match, so even an attempt to authenticate as one fails.
+    Secret milik confidential client dicek dalam constant time. Public client nggak akan pernah cocok, jadi bahkan percobaan mengautentikasi sebagai public client pun gagal.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/clients.go#L54-L61"
       ts="labs/03-oauth-pkce/ts/src/clients.ts#L38-L39"
       notes={{
-        56: "A public client has no secret, so it never matches.",
-        59: "Hash both sides first, then compare in constant time: neither timing nor length leaks.",
+        56: "Public client nggak punya secret, jadi nggak pernah cocok.",
+        59: "Hash kedua sisi dulu, baru bandingkan dalam constant time: timing maupun panjang nggak bocor.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Clients are public or confidential depending on whether they can keep a secret, not on how important they are.",
-        "SPAs, mobile and desktop apps are public. A client secret in their code protects nothing.",
-        "Public clients rely on PKCE. Confidential clients also authenticate with a secret or a key.",
-        "The implicit flow put the access token in the URL and was retired by RFC 9700 and OAuth 2.1. Use the code flow with PKCE.",
-        "Native apps sign in through the system browser, not an embedded web view (RFC 8252).",
+        "Client itu public atau confidential tergantung bisa-tidaknya menyimpan secret, bukan seberapa pentingnya.",
+        "SPA, mobile, dan desktop app itu public. Client secret di kodenya nggak melindungi apa-apa.",
+        "Public client mengandalkan PKCE. Confidential client juga mengautentikasi dengan secret atau key.",
+        "Implicit flow menaruh access token di URL dan dipensiunkan oleh RFC 9700 dan OAuth 2.1. Pakai code flow dengan PKCE.",
+        "Native app login lewat system browser, bukan embedded web view (RFC 8252).",
       ]}
       interview={[
         {
-          q: "What is the difference between a public and a confidential client?",
-          a: "A confidential client can keep a credential secret, such as a server-side app, and authenticates to the token endpoint with it. A public client runs on the user's device, such as a SPA or a mobile app, so it cannot, and it is protected by PKCE and exact redirect URIs.",
+          q: "Apa beda public client dan confidential client?",
+          a: "Confidential client bisa menyimpan credential secara rahasia, seperti app di sisi server, dan mengautentikasi ke token endpoint dengannya. Public client berjalan di perangkat user, seperti SPA atau mobile app, jadi nggak bisa, dan dilindungi oleh PKCE dan redirect URI yang persis.",
         },
         {
-          q: "Why was the implicit flow deprecated?",
-          a: "It returned the access token in the redirect URL, where it leaks to history, extensions and scripts, with no way to bind it to the client and no back-channel step. The authorization code flow with PKCE serves the same apps and keeps the token off the URL. RFC 9700 says not to use implicit, and OAuth 2.1 removes it.",
+          q: "Kenapa implicit flow di-deprecate?",
+          a: "Dia mengembalikan access token di URL redirect, tempat token bocor ke history, extension, dan script, tanpa cara mengikatnya ke client dan tanpa langkah back channel. Authorization code flow dengan PKCE melayani app yang sama dan menjaga token tetap di luar URL. RFC 9700 bilang jangan pakai implicit, dan OAuth 2.1 menghapusnya.",
         },
         {
-          q: "Can a single-page app be a confidential client?",
-          a: "Not by shipping a secret in its code, since the user can read it. A SPA can be paired with a backend for frontend that holds the secret and the tokens, but then the backend is the OAuth client and the SPA is just its UI.",
+          q: "Bisakah single-page app menjadi confidential client?",
+          a: "Bukan dengan menyertakan secret di kodenya, karena user bisa membacanya. SPA bisa dipasangkan dengan backend for frontend yang memegang secret dan token, tapi saat itu backend-lah OAuth client-nya dan SPA hanya UI-nya.",
         },
         {
-          q: "How should a native app sign the user in?",
-          a: "In the system browser, with the authorization code flow and PKCE, as RFC 8252 requires. An embedded web view lets the app read the password and cookies, and it breaks single sign-on.",
+          q: "Gimana native app seharusnya me-login-kan user?",
+          a: "Di system browser, dengan authorization code flow dan PKCE, sesuai RFC 8252. Embedded web view membuat app bisa membaca password dan cookie, dan merusak single sign-on.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain why a single-page app cannot use a client secret, and what protects its authorization code instead."
+      prompt="Jelaskan kenapa single-page app nggak bisa memakai client secret, dan apa yang melindungi authorization code-nya sebagai gantinya."
       rubric={[
-        "Anything delivered to the browser can be read by the user or an attacker",
-        "A secret in the bundle authenticates nobody, so the app is a public client",
-        "PKCE binds the code to the instance of the app that asked for it",
-        "Exact redirect URIs limit where the code can be sent",
+        "Apa pun yang dikirim ke browser bisa dibaca user atau attacker",
+        "Secret di bundle nggak mengautentikasi siapa pun, jadi app itu public client",
+        "PKCE mengikat code ke instance app yang memintanya",
+        "Redirect URI yang persis membatasi ke mana code bisa dikirim",
       ]}
     />
   </Step>

@@ -2,54 +2,54 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Everything so far had a human in the loop: someone to sign in, someone to click Approve. But a nightly report job, a billing service or a build pipeline has no human and no browser. It still has to call an API, and the API still wants a token.
+    Semua yang sudah kita bahas melibatkan manusia: ada yang login, ada yang klik Approve. Tapi job laporan malam, billing service, atau build pipeline nggak punya manusia dan nggak punya browser. Mereka tetap harus memanggil API, dan API tetap minta token.
 
-    For that case OAuth has a much shorter flow, with one request and no redirects.
+    Untuk kasus itu OAuth punya flow yang jauh lebih pendek: satu request, tanpa redirect.
 
-    <Analogy title="The company badge">
-      A delivery robot at an office has no name or face, so it carries a company badge that opens exactly the doors it is allowed to. The guard checks the badge, not a person. Client credentials is the badge.
+    <Analogy title="Kartu akses karyawan">
+      Robot pengantar paket di kantor nggak punya nama atau wajah, jadi dia membawa kartu akses yang hanya membuka pintu-pintu yang boleh dimasukinya. Satpam mengecek kartunya, bukan orangnya. Client credentials adalah kartu itu.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    The **client credentials grant** (RFC 6749 section 4.4) lets a confidential client get an access token **for itself**. There is no resource owner, no consent page and no authorization code.
+  <Step id="concept" title="Konsep">
+    **Client credentials grant** (RFC 6749 section 4.4) membuat confidential client bisa mendapat access token **untuk dirinya sendiri**. Nggak ada resource owner, nggak ada halaman consent, nggak ada authorization code.
 
     <SequenceFlow flow={flows.clientCredentials} />
 
-    The client sends `POST /token` with `grant_type=client_credentials`, an optional `scope`, and authenticates itself. The most common way is HTTP Basic, with the client id and secret joined by a colon and base64 encoded (RFC 6749 section 2.3.1). The answer is an access token and no refresh token.
+    Client mengirim `POST /token` dengan `grant_type=client_credentials`, `scope` opsional, dan mengautentikasi dirinya. Cara paling umum adalah HTTP Basic, dengan client id dan secret digabung pakai titik dua lalu di-encode base64 (RFC 6749 section 2.3.1). Jawabannya access token tanpa refresh token.
 
-    Points worth remembering:
+    Hal-hal yang perlu diingat:
 
-    - **The subject is the client.** The token's `sub` is `demo-backend`, not a user. An API must not treat such a token as a user's.
-    - **The scope is capped by registration.** The client may ask for less than it is allowed, never more: `scope=profile` for `demo-backend` gives `invalid_scope`.
-    - **No refresh token.** The client can authenticate again whenever it needs a token, so a long-lived refresh token would add risk and no benefit.
-    - **Wrong secret: `401 invalid_client`**, with a `WWW-Authenticate: Basic` header (RFC 6749 section 5.2).
-    - **Only for confidential clients.** The secret must stay on a server. Browser and mobile apps cannot use this grant.
+    - **Subject-nya adalah client.** `sub` di token adalah `demo-backend`, bukan user. API tidak boleh memperlakukan token seperti itu sebagai token user.
+    - **Scope dibatasi oleh registrasi.** Client boleh meminta lebih sedikit dari yang diizinkan, tidak pernah lebih: `scope=profile` untuk `demo-backend` menghasilkan `invalid_scope`.
+    - **Tanpa refresh token.** Client bisa mengautentikasi lagi kapan pun butuh token, jadi refresh token berumur panjang hanya menambah risiko tanpa manfaat.
+    - **Secret salah: `401 invalid_client`**, dengan header `WWW-Authenticate: Basic` (RFC 6749 section 5.2).
+    - **Hanya untuk confidential client.** Secret harus tetap di server. App browser dan mobile nggak bisa memakai grant ini.
 
-    How the two main grants compare:
+    Perbandingan dua grant utama:
 
     | | **Authorization code + PKCE** | **Client credentials** |
     |---|---|---|
-    | A user is involved | Yes, signs in and consents | No |
-    | Browser and redirects | Yes | None |
-    | Token is about | The user, granted to the client | The client itself |
-    | Client authentication | Public: PKCE. Confidential: secret too | Secret or key, always |
-    | Refresh token | Possible | Not issued |
-    | Typical use | A user's app acting for them | Service to service, jobs, automation |
+    | Ada user yang terlibat | Ya, login dan memberi consent | Tidak |
+    | Browser dan redirect | Ya | Tidak ada |
+    | Token ini tentang | User, diberikan ke client | Client itu sendiri |
+    | Autentikasi client | Public: PKCE. Confidential: secret juga | Secret atau key, selalu |
+    | Refresh token | Mungkin | Tidak diterbitkan |
+    | Pemakaian umum | App milik user yang bertindak atas nama user | Service ke service, job, otomasi |
 
     <Callout type="warn">
-      A shared secret is a password for a program. Keep it in a secrets manager, never in the repository or an image, give each service its own, and rotate it. Stronger client authentication exists, such as signed JWT assertions or mutual TLS (RFC 7523, RFC 8705), and removes the shared secret altogether.
+      Shared secret itu password untuk sebuah program. Simpan di secrets manager, jangan pernah di repository atau image, beri tiap service secret-nya sendiri, dan rotasi. Ada client authentication yang lebih kuat, seperti signed JWT assertion atau mutual TLS (RFC 7523, RFC 8705), yang menghilangkan shared secret sama sekali.
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Be the backend job. The console below calls `POST /token` as `demo-backend` (secret `lab-secret`), using HTTP Basic.
+    Jadilah backend job. Console di bawah memanggil `POST /token` sebagai `demo-backend` (secret `lab-secret`), memakai HTTP Basic.
 
     <LabTasks />
 
@@ -57,21 +57,21 @@ import { flows } from "@/content/flows";
       lab="03"
       actions={[
         {
-          label: "Get a token",
+          label: "Ambil token",
           method: "POST",
           path: "/token",
           headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOmxhYi1zZWNyZXQ=" },
           body: "grant_type=client_credentials&scope=photos.read",
         },
         {
-          label: "Wrong secret",
+          label: "Secret salah",
           method: "POST",
           path: "/token",
           headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOm5vcGU=" },
           body: "grant_type=client_credentials",
         },
         {
-          label: "Ask for a scope it lacks",
+          label: "Minta scope yang nggak dimiliki",
           method: "POST",
           path: "/token",
           headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOmxhYi1zZWNyZXQ=" },
@@ -80,80 +80,80 @@ import { flows } from "@/content/flows";
       ]}
     />
 
-    1. Click **Get a token**. The answer is `200` with `access_token`, `token_type`, `expires_in` and `scope`: `photos.read`. There is no `refresh_token`.
-    2. Click **Wrong secret**. You get `401` with `invalid_client` and a `WWW-Authenticate: Basic` header.
-    3. Click **Ask for a scope it lacks**. You get `400 invalid_scope`: `profile` is not among `demo-backend`'s registered scopes.
-    4. Decode the token from step 1 the way you did in Module 2 (it is base64url JSON in the middle segment). Both `sub` and `client_id` are `demo-backend`.
+    1. Klik **Ambil token**. Jawabannya `200` dengan `access_token`, `token_type`, `expires_in`, dan `scope`: `photos.read`. Nggak ada `refresh_token`.
+    2. Klik **Secret salah**. Kamu mendapat `401` dengan `invalid_client` dan header `WWW-Authenticate: Basic`.
+    3. Klik **Minta scope yang nggak dimiliki**. Kamu mendapat `400 invalid_scope`: `profile` nggak termasuk scope terdaftar milik `demo-backend`.
+    4. Decode token dari langkah 1 seperti yang kamu lakukan di Modul 2 (isinya JSON base64url di segmen tengah). `sub` dan `client_id` sama-sama `demo-backend`.
 
-    Then use it. The API is on a different port, so copy the `access_token` from the console and call it with `curl` (port `4123` for Go, `4223` for TypeScript):
+    Lalu pakai tokennya. API ada di port lain, jadi salin `access_token` dari console dan panggil dengan `curl` (port `4123` untuk Go, `4223` untuk TypeScript):
 
     ```bash
     curl -i http://localhost:4123/api/photos -H "Authorization: Bearer TOKEN"
     ```
 
-    The API treated it like any other valid token: it checked the signature, issuer, audience and expiry, saw `photos.read`, and answered `200`. It never needed to know that no user was involved.
+    API memperlakukannya seperti token valid lainnya: dia mengecek signature, issuer, audience, dan expiry, melihat `photos.read`, dan menjawab `200`. Dia nggak perlu tahu bahwa nggak ada user yang terlibat.
   </Step>
 
-  <Step id="code" title="Code">
-    The whole grant is one handler. Three decisions are visible: authenticate the client, cap the scope, and make the client its own subject.
+  <Step id="code" title="Kode">
+    Seluruh grant ini cuma satu handler. Tiga keputusan kelihatan di sini: autentikasi client, batasi scope, dan jadikan client sebagai subject-nya sendiri.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/as.go#L442-L468"
       ts="labs/03-oauth-pkce/ts/src/as.ts#L223-L241"
       notes={{
-        443: "The Basic header gives the client id and secret.",
-        445: "Unknown client, wrong grant type or wrong secret all give the same invalid_client.",
-        452: "Requested scope must be a subset of the client's registered scope.",
-        459: "sub is the client itself: there is no user.",
-        224: "The Basic header gives the client id and secret.",
-        228: "Unknown client, wrong grant type or wrong secret all give the same invalid_client.",
-        233: "Requested scope must be a subset of the client's registered scope.",
-        238: "sub is the client itself: there is no user.",
+        443: "Header Basic memberi client id dan secret.",
+        445: "Client tidak dikenal, grant type salah, atau secret salah semuanya menghasilkan invalid_client yang sama.",
+        452: "Scope yang diminta harus subset dari scope terdaftar milik client.",
+        459: "sub adalah client itu sendiri: tidak ada user.",
+        224: "Header Basic memberi client id dan secret.",
+        228: "Client tidak dikenal, grant type salah, atau secret salah semuanya menghasilkan invalid_client yang sama.",
+        233: "Scope yang diminta harus subset dari scope terdaftar milik client.",
+        238: "sub adalah client itu sendiri: tidak ada user.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Client credentials gives a confidential client a token for itself: no user, no redirect, no consent.",
-        "The client authenticates with its secret (HTTP Basic or a stronger method) and may request only scopes it is registered for.",
-        "The token's subject is the client. There is no refresh token: the client just asks again.",
-        "Never use it from a browser or mobile app, which cannot keep the secret.",
-        "A wrong secret is 401 invalid_client, a scope outside the registration is 400 invalid_scope.",
+        "Client credentials memberi confidential client token untuk dirinya sendiri: tanpa user, tanpa redirect, tanpa consent.",
+        "Client mengautentikasi dengan secret-nya (HTTP Basic atau metode yang lebih kuat) dan hanya boleh meminta scope yang terdaftar untuknya.",
+        "Subject token adalah client. Tidak ada refresh token: client tinggal meminta lagi.",
+        "Jangan pernah dipakai dari app browser atau mobile, yang nggak bisa menyimpan secret.",
+        "Secret salah itu 401 invalid_client, scope di luar registrasi itu 400 invalid_scope.",
       ]}
       interview={[
         {
-          q: "When would you use the client credentials grant?",
-          a: "For machine-to-machine calls where no user is involved, such as a backend service, a scheduled job or an integration. The service authenticates with its own credential and gets a token that represents the service itself, with the scopes it is registered for.",
+          q: "Kapan kamu memakai client credentials grant?",
+          a: "Untuk panggilan machine-to-machine tanpa user, seperti backend service, scheduled job, atau integrasi. Service mengautentikasi dengan credential-nya sendiri dan mendapat token yang mewakili service itu sendiri, dengan scope yang terdaftar untuknya.",
         },
         {
-          q: "Why does client credentials not issue a refresh token?",
-          a: "A refresh token exists to avoid asking the user to sign in again. There is no user here, and the client can authenticate again whenever it wants. A long-lived refresh token would just be another credential to protect.",
+          q: "Kenapa client credentials nggak menerbitkan refresh token?",
+          a: "Refresh token ada supaya user nggak perlu login lagi. Di sini nggak ada user, dan client bisa mengautentikasi lagi kapan pun dia mau. Refresh token berumur panjang cuma jadi credential tambahan yang harus dilindungi.",
         },
         {
-          q: "Can a single-page app use client credentials?",
-          a: "No. The secret would have to be in the browser, where everyone can read it, and anyone could then mint tokens as that client. Browser apps are public clients and use the authorization code flow with PKCE.",
+          q: "Bisakah single-page app memakai client credentials?",
+          a: "Nggak. Secret-nya harus ada di browser, tempat semua orang bisa membacanya, dan siapa pun lalu bisa mencetak token sebagai client itu. App browser adalah public client dan memakai authorization code flow dengan PKCE.",
         },
         {
-          q: "How does an API know a token came from client credentials and not from a user?",
-          a: "By the claims: the subject is the client's id rather than a user id, and there is no user-bound context. The API should decide per endpoint whether it accepts machine tokens, user tokens or both, and it should check scopes in either case.",
+          q: "Gimana API tahu sebuah token berasal dari client credentials dan bukan dari user?",
+          a: "Dari claim-nya: subject-nya adalah id client, bukan id user, dan nggak ada konteks yang terikat ke user. API sebaiknya memutuskan per endpoint apakah menerima token mesin, token user, atau keduanya, dan harus mengecek scope di kedua kasus.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate when to pick client credentials over the authorization code flow, and what the token represents."
+      prompt="Jelaskan ke rekan satu tim kapan memilih client credentials dibanding authorization code flow, dan apa yang diwakili tokennya."
       rubric={[
-        "Client credentials is for service-to-service calls with no user present",
-        "The token represents the client itself, not a user",
-        "The client authenticates with its own secret, and the secret must stay on a server",
-        "When the user's data or consent is involved, use the authorization code flow with PKCE",
+        "Client credentials untuk panggilan service-to-service tanpa user",
+        "Token mewakili client itu sendiri, bukan user",
+        "Client mengautentikasi dengan secret-nya sendiri, dan secret harus tetap di server",
+        "Kalau melibatkan data atau consent user, pakai authorization code flow dengan PKCE",
       ]}
     />
 
     <Callout type="info">
-      **Coming in Phase 2.** In Phase 2 you will build the single sign-on you have been preparing for. Here is how the flow from lesson 2 could map onto the parts in your plan: **sso-frontend** (Next.js), **sso-backend** (Go), **core-api** (Go) and **platforms A, B and C** (Next.js). It is a preview of the shape, not a design, and it says nothing about how those services are built inside.
+      **Segera di Phase 2.** Di Phase 2 kamu akan membangun single sign-on yang sedang kamu persiapkan ini. Berikut gambaran bagaimana flow dari lesson 2 bisa dipetakan ke bagian-bagian di rencanamu: **sso-frontend** (Next.js), **sso-backend** (Go), **core-api** (Go), dan **platform A, B, dan C** (Next.js). Ini preview bentuknya, bukan desain, dan nggak mengatakan apa pun soal cara service itu dibangun di dalamnya.
     </Callout>
 
     <SequenceFlow flow={flows.ssoPreview} />

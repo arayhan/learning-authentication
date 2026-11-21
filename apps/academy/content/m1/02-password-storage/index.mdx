@@ -1,71 +1,71 @@
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Sooner or later, a database leaks. The question that matters is what the attacker finds in the `users` table: passwords they can type into other sites, or something close to useless.
+    Cepat atau lambat, database pasti bocor. Yang penting adalah apa yang ditemukan attacker di tabel `users`: password yang bisa langsung dicoba di situs lain, atau sesuatu yang nyaris tidak berguna.
 
-    <Analogy title="The fingerprint">
-      A good lock keeps a scan of your fingerprint, never a copy of your finger. It can tell that a finger matches, but nobody can rebuild the finger from the scan. Password storage works the same way: keep something that can confirm a password, never the password.
+    <Analogy title="Sidik jari">
+      Kunci pintar yang bagus menyimpan hasil scan sidik jari kamu, bukan salinan jarimu. Ia bisa memastikan sebuah jari cocok, tapi tidak ada yang bisa membangun ulang jari dari hasil scan itu. Penyimpanan password sama: simpan sesuatu yang bisa mengonfirmasi password, bukan passwordnya.
     </Analogy>
   </Step>
 
-  <Step id="hash" title="Hash, don't store">
-    Three ways to keep a password, from worst to best.
+  <Step id="hash" title="Hash, jangan disimpan">
+    Ada tiga cara menyimpan password, dari yang terburuk sampai terbaik.
 
-    1. **Plaintext.** One leak exposes every account, and every other site where users reused the password.
-    2. **Encryption.** Better looking, same outcome. The app must be able to decrypt, so the key lives where the app runs, and an attacker who got the database often gets the key too.
-    3. **Hashing.** A one-way function. The server stores the hash, and at login it hashes the attempt and compares. There is nothing to decrypt.
+    1. **Plaintext.** Satu kebocoran membuka semua akun, plus semua situs lain tempat user memakai password yang sama.
+    2. **Encryption.** Kelihatannya lebih baik, hasilnya sama saja. App harus bisa men-decrypt, jadi key-nya ada di tempat app berjalan, dan attacker yang berhasil mencuri database sering ikut dapat key-nya.
+    3. **Hashing.** Fungsi satu arah. Server menyimpan hash, dan saat login ia meng-hash input lalu membandingkannya. Tidak ada yang perlu di-decrypt.
 
-    But "hashed" is not enough. MD5, SHA-1 and SHA-256 are designed to be **fast**. That is great for checking a download and terrible here, because a single GPU can test billions of guesses per second against a stolen hash, and most real passwords fall to a dictionary in minutes.
+    Tapi "di-hash" saja belum cukup. MD5, SHA-1, dan SHA-256 dirancang supaya **cepat**. Itu bagus untuk mengecek hasil download dan jelek banget untuk kasus ini, karena satu GPU bisa mencoba miliaran tebakan per detik terhadap hash curian, dan kebanyakan password asli jebol lewat dictionary dalam hitungan menit.
 
     <Callout type="security">
-      Never invent your own scheme, and never use a general-purpose hash (MD5, SHA-1, SHA-256, even SHA-3) on its own for passwords. Use a password hashing function: argon2id, scrypt, bcrypt or PBKDF2.
+      Jangan pernah bikin skema sendiri, dan jangan pakai hash serbaguna (MD5, SHA-1, SHA-256, bahkan SHA-3) mentah-mentah untuk password. Pakai password hashing function: argon2id, scrypt, bcrypt, atau PBKDF2.
     </Callout>
   </Step>
 
-  <Step id="salt" title="Salt and cost">
-    Two ingredients turn a hash into a password hash.
+  <Step id="salt" title="Salt dan cost">
+    Dua bahan ini yang mengubah hash biasa jadi password hash.
 
-    A **salt** is a random value, unique per password, stored right next to the hash. It is not secret. It makes every hash different, so one precomputed table cannot crack all users, and two people with the same password no longer look the same.
+    **Salt** adalah nilai acak yang unik per password, disimpan persis di sebelah hash-nya. Ia bukan rahasia. Salt bikin setiap hash berbeda, jadi satu tabel hasil hitung di muka tidak bisa menjebol semua user, dan dua orang dengan password sama tidak lagi kelihatan sama.
 
-    A **cost** makes each guess expensive on purpose. Argon2id is also **memory-hard**: every guess needs a large block of RAM, which takes away the advantage of GPUs and custom chips.
+    **Cost** sengaja bikin setiap tebakan mahal. Argon2id juga **memory-hard**: tiap tebakan butuh blok RAM yang besar, sehingga keunggulan GPU dan chip khusus hilang.
 
-    | Algorithm | Recommended setting (OWASP Password Storage cheat sheet) | Notes |
+    | Algoritma | Setelan rekomendasi (OWASP Password Storage cheat sheet) | Catatan |
     |---|---|---|
-    | argon2id | m=19456 KiB (19 MiB), t=2, p=1 | First choice. The lab uses exactly this. |
-    | scrypt | N=2^17, r=8, p=1 | Memory-hard too. |
-    | bcrypt | cost 10 or more | Truncates input at 72 bytes. Fine for legacy systems. |
-    | PBKDF2-HMAC-SHA256 | 600,000 iterations or more | For FIPS-bound systems. Not memory-hard. |
+    | argon2id | m=19456 KiB (19 MiB), t=2, p=1 | Pilihan pertama. Lab ini pakai persis ini. |
+    | scrypt | N=2^17, r=8, p=1 | Memory-hard juga. |
+    | bcrypt | cost 10 atau lebih | Memotong input di 72 byte. Oke untuk sistem lama. |
+    | PBKDF2-HMAC-SHA256 | 600.000 iterasi atau lebih | Untuk sistem yang terikat FIPS. Bukan memory-hard. |
 
-    A hash is usually stored as one self-describing **PHC string**, so the verifier never has to guess the settings:
+    Hash biasanya disimpan sebagai satu **PHC string** yang menjelaskan dirinya sendiri, jadi verifier tidak perlu menebak setelannya:
 
     ```text
     $argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo
     ```
 
-    Read it left to right: the algorithm, the version, the memory (KiB), time and parallelism settings, then the salt and the hash, both in unpadded base64.
+    Bacanya dari kiri ke kanan: algoritma, versi, setelan memory (KiB), time, dan parallelism, lalu salt dan hash, dua-duanya dalam base64 tanpa padding.
 
-    Because the parameters travel with the hash, you can raise the cost later and rehash each user the next time they log in.
+    Karena parameter ikut tersimpan bersama hash, kamu bisa menaikkan cost nanti dan me-rehash tiap user saat mereka login berikutnya.
 
-    **What about the password rules themselves?** NIST SP 800-63B says: allow long passphrases (at least 64 characters), accept spaces and Unicode, do not force "one uppercase, one symbol" composition rules, do not force periodic rotation, and reject passwords found in breach lists or common-password lists. The lab accepts 8 to 128 characters. The latest revision raises the single-factor minimum to 15, so treat the lab as a minimum, not a recommendation.
+    **Lalu aturan password-nya sendiri gimana?** NIST SP 800-63B bilang: izinkan passphrase panjang (minimal 64 karakter), terima spasi dan Unicode, jangan paksa aturan komposisi "satu huruf besar, satu simbol", jangan paksa ganti password berkala, dan tolak password yang ada di daftar breach atau daftar password umum. Lab ini menerima 8 sampai 128 karakter. Revisi terbaru menaikkan minimum single-factor jadi 15, jadi anggap lab ini sebagai batas bawah, bukan rekomendasi.
   </Step>
 
   <Step id="playground" title="Playground">
-    Feel the difference. This runs in your browser with Web Crypto, so no password ever leaves the page.
+    Rasakan bedanya. Ini jalan di browser kamu pakai Web Crypto, jadi password tidak pernah keluar dari halaman.
 
-    1. Type a password and compare the two **salts**: same password, completely different hashes.
-    2. Look at the SHA-256 row: it never changes speed.
-    3. Drag **Iterations** to the right and watch the PBKDF2 time grow. That growth is the point.
+    1. Ketik password dan bandingkan dua **salt**: password sama, hash-nya beda total.
+    2. Lihat baris SHA-256: kecepatannya tidak pernah berubah.
+    3. Geser **Iterations** ke kanan dan lihat waktu PBKDF2 membesar. Pertumbuhan itulah intinya.
 
     <HashPlayground />
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Now do it for real against the lab server. Click **Register** (each click creates a brand-new `learner-...@example.com` account), then **Log in** as it, and watch both requests in the Inspector.
+    Sekarang coba beneran ke lab server. Klik **Register** (tiap klik membuat akun `learner-...@example.com` yang baru), lalu **Log in** pakai akun itu, dan perhatikan kedua request di Inspector.
 
     <LabTasks />
 
@@ -77,89 +77,89 @@
       ]}
     />
 
-    Open the `POST /register` row in the Inspector. The request body shows `"password":"[redacted]"`: the lab's tracer scrubs passwords so they never show up in logs. The response is a `201` with an id and email, and no hash.
+    Buka baris `POST /register` di Inspector. Request body menampilkan `"password":"[redacted]"`: tracer lab ini menghapus password supaya tidak pernah muncul di log. Response-nya `201` berisi id dan email, tanpa hash.
 
-    Check the duration column too. Register and login are the slowest requests in the list, because argon2id is doing its job.
+    Lihat juga kolom duration. Register dan login adalah request paling lambat di daftar, karena argon2id sedang bekerja.
 
     <Callout type="info">
-      Every Register click makes a fresh random address, so you can repeat the lesson as often as you like. Credentials are in the Postgres `lab01` schema, shared by the Go and TS implementations, so an account created through one logs in through the other.
+      Setiap klik Register membuat alamat acak yang baru, jadi kamu bisa mengulang pelajaran ini sesering mungkin. Credentials tersimpan di schema Postgres `lab01`, dipakai bersama oleh implementasi Go dan TS, jadi akun yang dibuat lewat satu implementasi bisa login lewat yang lain.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    Here is the real code the lab runs. First, hashing: a fresh 16-byte salt, argon2id with the parameters from the table, and a PHC string as output.
+  <Step id="code" title="Kode">
+    Ini kode asli yang dijalankan lab. Pertama, hashing: salt 16 byte yang baru, argon2id dengan parameter dari tabel tadi, dan PHC string sebagai output.
 
     <CodeTabs
       go="labs/01-sessions/go/password.go#L13-L33"
       ts="labs/01-sessions/ts/src/password.ts#L3-L7"
       notes={{
-        26: "A new random 16-byte salt for every password.",
-        30: "argon2id with m=19456 KiB, t=2, p=1 and a 32-byte output.",
-        5: "The same parameters as the Go lab: the two hashes are interchangeable.",
+        26: "Salt acak 16 byte yang baru untuk setiap password.",
+        30: "argon2id dengan m=19456 KiB, t=2, p=1 dan output 32 byte.",
+        5: "Parameter yang sama dengan lab Go: kedua hash bisa saling dipakai.",
       }}
     />
 
-    Then verifying. The parameters come from the stored string, so old hashes keep working after you change the defaults. The comparison is constant-time, and anything malformed simply fails to verify.
+    Lalu verifikasi. Parameter diambil dari string yang tersimpan, jadi hash lama tetap jalan setelah kamu mengubah default. Perbandingannya constant-time, dan input yang rusak langsung gagal verifikasi.
 
     <CodeTabs
       go="labs/01-sessions/go/password.go#L35-L58"
       ts="labs/01-sessions/ts/src/password.ts#L9-L16"
       notes={{
-        56: "Recompute with the salt and parameters read from the stored PHC string.",
-        57: "Constant-time comparison, so timing reveals nothing about how many bytes matched.",
-        12: "The library reads the parameters from the PHC string and compares in constant time.",
+        56: "Hitung ulang pakai salt dan parameter yang dibaca dari PHC string yang tersimpan.",
+        57: "Perbandingan constant-time, jadi waktu eksekusi tidak membocorkan berapa byte yang cocok.",
+        12: "Library membaca parameter dari PHC string dan membandingkan secara constant-time.",
       }}
     />
 
-    And the register handler that ties it together:
+    Dan register handler yang menyatukan semuanya:
 
     <CodeTabs go="labs/01-sessions/go/server.go#L151-L177" ts="labs/01-sessions/ts/src/app.ts#L98-L110" />
 
     <Callout type="info">
-      Worth checking in your own **sso-backend**: which algorithm and cost does it store, and does a successful login rehash an old hash with the current settings? That one habit is how you raise the cost later without a password reset.
+      Coba cek di **sso-backend** kamu sendiri: algoritma dan cost apa yang dipakai, dan apakah login yang sukses me-rehash hash lama dengan setelan terbaru? Kebiasaan itu yang bikin kamu bisa menaikkan cost nanti tanpa reset password.
     </Callout>
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Store a salted, slow, one-way hash. Never plaintext, never reversible encryption.",
-        "SHA-256 is fast by design, which is exactly wrong for passwords.",
-        "The salt is unique and public. The cost parameters make each guess expensive.",
-        "argon2id (m=19456 KiB, t=2, p=1) is the current first choice; the PHC string carries its own settings.",
-        "NIST 800-63B: long passphrases, no composition rules, no forced rotation, check against breach lists.",
+        "Simpan hash yang di-salt, lambat, dan satu arah. Jangan plaintext, jangan encryption yang bisa dibalik.",
+        "SHA-256 cepat by design, dan itu justru salah untuk password.",
+        "Salt itu unik dan publik. Parameter cost bikin tiap tebakan mahal.",
+        "argon2id (m=19456 KiB, t=2, p=1) adalah pilihan pertama saat ini; PHC string membawa setelannya sendiri.",
+        "NIST 800-63B: passphrase panjang, tanpa aturan komposisi, tanpa ganti password paksa, cek terhadap daftar breach.",
       ]}
       interview={[
         {
-          q: "How should you store user passwords?",
-          a: "With a password hashing function such as argon2id, using a unique random salt per password and cost parameters tuned to your hardware, saved as a PHC string. Never plaintext or reversible encryption.",
+          q: "Gimana cara menyimpan password user?",
+          a: "Pakai password hashing function seperti argon2id, dengan salt acak yang unik per password dan parameter cost yang disesuaikan dengan hardware kamu, disimpan sebagai PHC string. Jangan plaintext atau encryption yang bisa dibalik.",
         },
         {
-          q: "Why can't you just use SHA-256, even with a salt?",
-          a: "SHA-256 is extremely fast, so an attacker with a stolen database can test enormous numbers of guesses per second. A password hash must be deliberately slow, and argon2id also needs a lot of memory per guess.",
+          q: "Kenapa tidak cukup pakai SHA-256, walaupun sudah di-salt?",
+          a: "SHA-256 sangat cepat, jadi attacker yang mencuri database bisa mencoba tebakan dalam jumlah luar biasa besar per detik. Password hash harus sengaja dibuat lambat, dan argon2id juga butuh memory besar per tebakan.",
         },
         {
-          q: "Does the salt have to be secret?",
-          a: "No. It is stored next to the hash. Its job is uniqueness: it defeats precomputed tables and stops identical passwords from producing identical hashes.",
+          q: "Apakah salt harus dirahasiakan?",
+          a: "Tidak. Ia disimpan di sebelah hash. Tugasnya menjaga keunikan: menggagalkan precomputed table dan mencegah password yang sama menghasilkan hash yang sama.",
         },
         {
-          q: "How do you increase the work factor on a live system?",
-          a: "Raise the parameters for new hashes. When a user logs in with the right password, rehash with the new parameters and store the new PHC string. Each hash carries its own settings, so old ones keep verifying until then.",
+          q: "Gimana cara menaikkan work factor di sistem yang sudah live?",
+          a: "Naikkan parameter untuk hash baru. Saat user login dengan password yang benar, rehash pakai parameter baru dan simpan PHC string yang baru. Tiap hash membawa setelannya sendiri, jadi yang lama tetap bisa diverifikasi sampai saat itu.",
         },
         {
-          q: "bcrypt or argon2id?",
-          a: "argon2id is the first choice because it is memory-hard. bcrypt is still acceptable at cost 10 or higher, but it truncates input at 72 bytes and is not memory-hard.",
+          q: "bcrypt atau argon2id?",
+          a: "argon2id pilihan pertama karena memory-hard. bcrypt masih bisa diterima di cost 10 atau lebih, tapi ia memotong input di 72 byte dan bukan memory-hard.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Your database was just leaked. Explain to a non-technical manager what the attacker has, and why password hashing matters."
+      prompt="Database kamu baru saja bocor. Jelaskan ke manajer non-teknis apa yang dipegang attacker, dan kenapa password hashing itu penting."
       rubric={[
-        "They have hashes and salts, not passwords",
-        "Fast hashes can be guessed at billions per second, slow ones cannot",
-        "Salts stop one precomputed table from cracking everyone",
-        "Weak passwords still fall first, so strong rules and breach checks matter",
+        "Mereka punya hash dan salt, bukan password",
+        "Hash cepat bisa ditebak miliaran kali per detik, hash lambat tidak",
+        "Salt mencegah satu precomputed table menjebol semua orang",
+        "Password lemah tetap jebol duluan, jadi aturan yang kuat dan pengecekan breach itu penting",
       ]}
     />
   </Step>

@@ -11,7 +11,7 @@ export function XpBar({ xp, level }: { xp: number; level: { name: string; min: n
           {xp} XP{level.next !== null && ` / ${level.next}`}
         </span>
       </div>
-      <Progress value={into} min={0} max={span} aria-label={`XP progress in ${level.name}`} />
+      <Progress value={into} min={0} max={span} aria-label={`Progress XP di level ${level.name}`} />
     </div>
   );
 }

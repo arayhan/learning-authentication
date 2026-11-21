@@ -40,7 +40,7 @@ export function Quiz({ id, gate = false }: { id: string; gate?: boolean }) {
   };
 
   if (isDone(ref)) {
-    return <p className="rounded-lg border bg-muted/40 p-4 text-sm font-medium">Quiz passed.</p>;
+    return <p className="rounded-lg border bg-muted/40 p-4 text-sm font-medium">Quiz lulus.</p>;
   }
 
   const i = answers.length;
@@ -57,26 +57,26 @@ export function Quiz({ id, gate = false }: { id: string; gate?: boolean }) {
       {fail && fail !== "error" ? (
         <div className="space-y-3">
           <p role="alert" className="text-sm font-medium">
-            You scored {fail.score} of {fail.total}. Every answer has to be right to pass.
+            Skor kamu {fail.score} dari {fail.total}. Semua jawaban harus benar biar lulus.
           </p>
-          <Button variant="outline" onClick={reset}>Try again</Button>
+          <Button variant="outline" onClick={reset}>Coba lagi</Button>
         </div>
       ) : fail === "error" ? (
         <div className="space-y-3">
-          <p role="alert" className="text-sm text-destructive">Could not submit your answers.</p>
-          <Button variant="outline" onClick={() => submit(answers)}>Retry</Button>
+          <p role="alert" className="text-sm text-destructive">Jawabanmu gagal dikirim.</p>
+          <Button variant="outline" onClick={() => submit(answers)}>Coba lagi</Button>
         </div>
       ) : !q ? (
         <div className="space-y-3">
           <p role="status" className="text-sm text-muted-foreground">
-            {awaitingLogin ? "Sign in again to submit your answers." : "Checking your answers…"}
+            {awaitingLogin ? "Login lagi dulu buat kirim jawabanmu." : "Lagi ngecek jawabanmu…"}
           </p>
-          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Sign in again</Button>}
+          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Login lagi</Button>}
         </div>
       ) : (
         <>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Question {i + 1} of {total}
+            Pertanyaan {i + 1} dari {total}
           </p>
           <p className="font-medium">{q.prompt}</p>
           <div className="space-y-2">
@@ -92,10 +92,10 @@ export function Quiz({ id, gate = false }: { id: string; gate?: boolean }) {
           {picked !== null && (
             <div className="space-y-3">
               <p role="status" className="text-sm">
-                <span className="font-medium">{picked === q.answer ? "Correct. " : "Not quite. "}</span>
+                <span className="font-medium">{picked === q.answer ? "Benar. " : "Belum tepat. "}</span>
                 {q.why}
               </p>
-              <Button onClick={next}>{i === total - 1 ? "Finish" : "Next"}</Button>
+              <Button onClick={next}>{i === total - 1 ? "Selesai" : "Berikutnya"}</Button>
             </div>
           )}
         </>

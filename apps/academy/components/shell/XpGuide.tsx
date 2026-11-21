@@ -1,16 +1,16 @@
 const ROWS: [string, number][] = [
-  ["Lesson step", 10],
-  ["Quiz pass", 20],
-  ["Lab task", 15],
+  ["Langkah lesson", 10],
+  ["Lulus quiz", 20],
+  ["Task lab", 15],
   ["Attack", 30],
-  ["Boss pass", 100],
+  ["Lulus boss", 100],
 ];
 
 /** Static reference for the dashboard's right pane. */
 export function XpGuide() {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">XP is awarded once per activity.</p>
+      <p className="text-sm text-muted-foreground">XP cuma dikasih sekali per aktivitas.</p>
       <dl className="divide-y text-sm">
         {ROWS.map(([k, v]) => (
           <div key={k} className="flex justify-between py-2">

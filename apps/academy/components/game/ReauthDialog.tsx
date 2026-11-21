@@ -34,10 +34,10 @@ export function ReauthDialog({
         onSuccess();
         onOpenChange(false);
       } else {
-        setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Sign-in failed");
+        setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Login gagal");
       }
     } catch {
-      setError("Network error. Try again.");
+      setError("Network error. Coba lagi.");
     } finally {
       setPending(false);
     }
@@ -47,8 +47,8 @@ export function ReauthDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Session expired</DialogTitle>
-          <DialogDescription>Sign in again to keep your progress. You will stay on this page.</DialogDescription>
+          <DialogTitle>Session habis</DialogTitle>
+          <DialogDescription>Login lagi biar progress kamu tetap aman. Kamu tetap di halaman ini kok.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
@@ -61,7 +61,7 @@ export function ReauthDialog({
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={pending} className="w-full">
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? "Lagi login…" : "Login"}
           </Button>
         </form>
       </DialogContent>

@@ -12,9 +12,9 @@ import { OfflineCard } from "./OfflineCard";
 const REF = "m1-l4/fixation";
 const VICTIM = { email: "fixation-victim@example.com", password: "correct horse battery" };
 const STEPS = [
-  "Attacker plants a session id they chose in the victim's browser",
-  "Victim logs in, carrying that session id",
-  "Attacker replays the id: GET /me",
+  "Attacker menanam session id pilihannya di browser korban",
+  "Korban login, membawa session id itu",
+  "Attacker memakai ulang id itu: GET /me",
 ];
 
 type Mode = "vulnerable" | "secure";
@@ -22,16 +22,16 @@ type Col = { step: number; outcome?: { status: number; body: string }; error?: s
 
 const COPY: Record<Mode, { title: string; header: string; win: string; lose: string }> = {
   vulnerable: {
-    title: "Vulnerable mode",
+    title: "Mode vulnerable",
     header: "X-Lab-Mode: vulnerable",
-    win: "The login kept the attacker's id, so the attacker is now signed in as the victim.",
-    lose: "Unexpected: the attacker should have got in.",
+    win: "Login mempertahankan id milik attacker, jadi attacker sekarang login sebagai korban.",
+    lose: "Di luar dugaan: harusnya attacker berhasil masuk.",
   },
   secure: {
     title: "Secure (default)",
-    header: "no special header",
-    win: "Unexpected: the attacker should have been refused.",
-    lose: "The login issued a fresh id and deleted the planted one, so the attacker's id is worthless.",
+    header: "tanpa header khusus",
+    win: "Di luar dugaan: harusnya attacker ditolak.",
+    lose: "Login menerbitkan id baru dan menghapus id yang ditanam, jadi id attacker nggak ada gunanya.",
   },
 };
 
@@ -75,13 +75,13 @@ export function FixationAttack() {
       await post("/register", VICTIM, false); // 201, or 409 when it already exists: both fine
       // The helper is only reachable in vulnerable mode, for both runs: browsers forbid JS from planting a cookie, so the lab does it.
       const plant = await post("/__attack/plant-sid", { sid }, true);
-      if (!plant.ok) return patch({ step: 1, error: `Planting the session id failed (${plant.status}). Restart the lab.` });
+      if (!plant.ok) return patch({ step: 1, error: `Gagal menanam session id (${plant.status}). Restart lab-nya.` });
       patch({ step: 1 });
       const login = await post("/login", VICTIM, mode === "vulnerable");
-      if (!login.ok) return patch({ step: 2, error: `The victim's login failed (${login.status}).` });
+      if (!login.ok) return patch({ step: 2, error: `Login korban gagal (${login.status}).` });
       patch({ step: 2 });
       const as = await post("/__attack/as", { sid, path: "/me" }, true);
-      if (!as.ok) return patch({ step: 3, error: `The replay failed (${as.status}).` });
+      if (!as.ok) return patch({ step: 3, error: `Replay gagal (${as.status}).` });
       const { status, body } = (await as.json()) as { status: number; body: string };
       patch({ step: 3, outcome: { status, body } });
     } catch {
@@ -95,9 +95,9 @@ export function FixationAttack() {
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold">Session fixation, live</h3>
+        <h3 className="text-sm font-semibold">Session fixation, langsung</h3>
         <p className="text-xs text-muted-foreground">
-          Runs against the lab at {labBase("01", impl)}. Open the Inspector to watch every request. The victim account is created for you.
+          Jalan di lab pada {labBase("01", impl)}. Buka Inspector buat mantau tiap request. Akun korban dibuatin otomatis.
         </p>
       </div>
 
@@ -137,18 +137,18 @@ export function FixationAttack() {
                 </div>
               )}
               <Button variant="outline" size="sm" disabled={running !== null} onClick={() => void run(mode)}>
-                Run {mode}
+                Jalankan {mode}
               </Button>
             </section>
           );
         })}
       </div>
 
-      {expected && !awaitingLogin && <p className="text-sm font-medium">Attack complete: same attack, opposite outcome.</p>}
+      {expected && !awaitingLogin && <p className="text-sm font-medium">Attack selesai: attack sama, hasil berlawanan.</p>}
       {awaitingLogin && (
         <div className="flex items-center gap-2">
-          <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
-          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Sign in again</Button>
+          <p role="status" className="text-sm text-muted-foreground">Login lagi buat nyimpen progress kamu.</p>
+          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Login lagi</Button>
         </div>
       )}
     </div>

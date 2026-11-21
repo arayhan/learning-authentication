@@ -2,170 +2,170 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    The user has to approve the app at the authorization server, and then the app has to get a token. The tricky part is how the result gets back to the app, because the only road between the two is the **browser**, and the browser is a public place: URLs land in history, logs, `Referer` headers and extensions.
+    User harus menyetujui app di authorization server, lalu app harus mendapat token. Bagian tricky-nya: gimana hasilnya balik ke app? Satu-satunya jalan antara keduanya adalah **browser**, dan browser itu tempat umum: URL masuk ke history, log, header `Referer`, dan extension.
 
-    The authorization code flow solves it by splitting the delivery in two. The browser carries something nearly worthless, and the valuable part travels on a private line.
+    Authorization code flow menyelesaikannya dengan membagi pengiriman jadi dua. Browser membawa sesuatu yang nyaris nggak berharga, sedangkan bagian yang berharga lewat jalur privat.
 
-    <Analogy title="The claim ticket">
-      At a coat check you hand in your coat and get a paper ticket. The ticket alone is just paper, and only the counter can swap it for your coat. The code is the ticket, and the token request is the counter.
+    <Analogy title="Tiket penitipan tas">
+      Di penitipan tas supermarket, kamu menyerahkan tas dan dapat nomor tiket. Tiket itu sendiri cuma secarik kertas, dan hanya petugas di konter yang bisa menukarnya dengan tasmu. Code itu tiketnya, dan token request itu konternya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    The flow has two channels. The **front channel** goes through the user's browser (redirects). The **back channel** is a direct HTTPS call from the client to the authorization server.
+  <Step id="concept" title="Konsep">
+    Flow ini punya dua channel. **Front channel** lewat browser user (redirect). **Back channel** adalah panggilan HTTPS langsung dari client ke authorization server.
 
     <SequenceFlow flow={flows.authCode} />
 
-    **Step 1, the authorization request** (front channel). The client sends the browser to `GET /authorize` with these query parameters (RFC 6749 section 4.1.1):
+    **Langkah 1, authorization request** (front channel). Client mengarahkan browser ke `GET /authorize` dengan query parameter berikut (RFC 6749 section 4.1.1):
 
-    | Parameter | Meaning |
+    | Parameter | Artinya |
     |---|---|
-    | `response_type=code` | Use the authorization code flow |
-    | `client_id` | Which registered client is asking |
-    | `redirect_uri` | Where to send the browser back. Must match a registered value exactly |
-    | `scope` | The access requested, space separated |
-    | `state` | An unguessable value the client checks on return (lesson 5) |
-    | `code_challenge`, `code_challenge_method` | PKCE (lesson 4). Required by the lab |
+    | `response_type=code` | Pakai authorization code flow |
+    | `client_id` | Client terdaftar mana yang meminta |
+    | `redirect_uri` | Ke mana browser dikembalikan. Harus sama persis dengan nilai yang terdaftar |
+    | `scope` | Akses yang diminta, dipisah spasi |
+    | `state` | Nilai yang nggak bisa ditebak, dicek client saat kembali (lesson 5) |
+    | `code_challenge`, `code_challenge_method` | PKCE (lesson 4). Wajib di lab |
 
-    **Step 2, authentication and consent.** The authorization server shows its own sign-in page and a consent screen. Only here does the password exist.
+    **Langkah 2, autentikasi dan consent.** Authorization server menampilkan halaman login-nya sendiri dan layar consent. Hanya di sini password itu ada.
 
-    **Step 3, the redirect back** (front channel). On approval the server answers `302` to `redirect_uri` with `?code=...&state=...`. On refusal it sends `?error=access_denied`.
+    **Langkah 3, redirect balik** (front channel). Kalau disetujui, server menjawab `302` ke `redirect_uri` dengan `?code=...&state=...`. Kalau ditolak, dia mengirim `?error=access_denied`.
 
-    **Step 4, the token request** (back channel). The client calls `POST /token` with `grant_type=authorization_code`, the `code`, the same `redirect_uri` and its `client_id` (plus the PKCE verifier). The answer is the access token.
+    **Langkah 4, token request** (back channel). Client memanggil `POST /token` dengan `grant_type=authorization_code`, `code`, `redirect_uri` yang sama, dan `client_id` (plus PKCE verifier). Jawabannya adalah access token.
 
-    The code is deliberately weak on its own. In the lab it is:
+    Code sengaja dibuat lemah kalau berdiri sendiri. Di lab, code itu:
 
-    - **Short-lived**: 60 seconds.
-    - **Single-use**: redeeming it a second time fails, and the tokens from the first redemption are revoked.
-    - **Bound** to the client and the exact `redirect_uri` it was issued for.
-    - **Stored hashed**: the database holds sha256 of the code, as with session ids in Module 1.
+    - **Umur pendek**: 60 detik.
+    - **Sekali pakai**: dipakai kedua kali akan gagal, dan token dari penukaran pertama dicabut.
+    - **Terikat** ke client dan `redirect_uri` persis yang dipakai saat code diterbitkan.
+    - **Disimpan dalam bentuk hash**: database menyimpan sha256 dari code, seperti session id di Modul 1.
 
     <Callout type="security">
-      The order of checks matters. RFC 6749 section 4.1.2.1 says that a bad `client_id` or `redirect_uri` gets an **error page and no redirect**, because redirecting to an unverified URL would make the server an open redirector. Only later errors (`invalid_scope`, `access_denied`, a missing `response_type`) are reported by redirecting back with `?error=...&state=...`.
+      Urutan pengecekan itu penting. RFC 6749 section 4.1.2.1 bilang `client_id` atau `redirect_uri` yang salah mendapat **halaman error tanpa redirect**, karena me-redirect ke URL yang belum diverifikasi menjadikan server sebagai open redirector. Hanya error yang datang setelahnya (`invalid_scope`, `access_denied`, `response_type` yang hilang) dilaporkan lewat redirect balik dengan `?error=...&state=...`.
     </Callout>
 
-    Every token response carries `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 section 5.1), for the same reason you saw in Module 2: a token must never sit in a cache.
+    Setiap token response membawa `Cache-Control: no-store` dan `Pragma: no-cache` (RFC 6749 section 5.1), alasannya sama seperti yang kamu lihat di Modul 2: token nggak boleh nangkring di cache.
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Run the whole flow once with a real client. The lab serves a small single-page app that plays `demo-spa`.
+    Jalankan seluruh flow sekali dengan client sungguhan. Lab menyajikan single-page app kecil yang berperan sebagai `demo-spa`.
 
-    1. Open the client for the implementation you selected: [http://localhost:4113](http://localhost:4113) for Go, [http://localhost:4213](http://localhost:4213) for TypeScript.
-    2. Leave **vulnerable mode** unticked and click **Sign in with Demo AS**.
-    3. Sign in as `alice@example.com` with password `correct-horse-battery`, then click **Approve**.
-    4. Back at the app, read the numbered steps: the code, the state check, the token exchange, the access token's claims and the call to `/api/photos`.
+    1. Buka client untuk implementasi yang kamu pilih: [http://localhost:4113](http://localhost:4113) untuk Go, [http://localhost:4213](http://localhost:4213) untuk TypeScript.
+    2. Biarkan **vulnerable mode** tidak dicentang, lalu klik **Sign in with Demo AS**.
+    3. Login sebagai `alice@example.com` dengan password `correct-horse-battery`, lalu klik **Approve**.
+    4. Setelah kembali ke app, baca langkah-langkah bernomor: code, pengecekan state, token exchange, claim di access token, dan panggilan ke `/api/photos`.
 
     <Shot
       src="/shots/lab03-spa-log.png"
-      alt="The Lab 03 client page after a finished sign-in. A numbered log lists the prepared request with code verifier, challenge and state, the redirect to the authorization server's authorize URL, and the received authorization code with a matching state."
-      caption="What the client page shows once the flow has run."
+      alt="Halaman client Lab 03 setelah login selesai. Log bernomor menampilkan request yang disiapkan dengan code verifier, challenge, dan state, redirect ke authorize URL milik authorization server, dan authorization code yang diterima dengan state yang cocok."
+      caption="Yang tampil di halaman client setelah flow selesai."
       callouts={[
-        { x: 23, y: 38, label: "Prepare the request: the verifier stays in this tab, only its hash goes out." },
-        { x: 23, y: 61, label: "Redirect to the authorization server: everything about the request is in the query string." },
-        { x: 23, y: 85, label: "The code comes back with the same state value, so the client accepts it." },
+        { x: 23, y: 38, label: "Menyiapkan request: verifier tetap di tab ini, hanya hash-nya yang dikirim keluar." },
+        { x: 23, y: 61, label: "Redirect ke authorization server: semua isi request ada di query string." },
+        { x: 23, y: 85, label: "Code kembali bersama nilai state yang sama, jadi client menerimanya." },
       ]}
     />
 
     <LabTasks />
 
-    Then look at what the Inspector recorded. Select the rows one at a time:
+    Lalu lihat apa yang direkam Inspector. Pilih barisnya satu per satu:
 
-    - `GET /authorize` (role `as`): the whole request in the query string.
-    - `POST /consent` (role `as`): a `302` whose **Location** header holds the `code`. This is the redirect the browser followed.
-    - `POST /token` (role `as`): the code and verifier go in, the access token comes out. This is the back channel.
-    - `GET /api/photos` (role `api`): the request carries `Authorization: Bearer ...`.
+    - `GET /authorize` (role `as`): seluruh request ada di query string.
+    - `POST /consent` (role `as`): sebuah `302` yang header **Location**-nya berisi `code`. Ini redirect yang diikuti browser.
+    - `POST /token` (role `as`): code dan verifier masuk, access token keluar. Ini back channel.
+    - `GET /api/photos` (role `api`): request membawa `Authorization: Bearer ...`.
 
-    Two requests you can make by hand in the console below. The first proves that a bad client gets an error page with no redirect, and the second shows the public keys the API uses to verify tokens.
+    Dua request yang bisa kamu kirim manual di console di bawah. Yang pertama membuktikan client yang tidak dikenal mendapat halaman error tanpa redirect, dan yang kedua menampilkan public key yang dipakai API untuk memverifikasi token.
 
     <LabConsole
       lab="03"
       actions={[
-        { label: "Authorize with an unknown client", method: "GET", path: "/authorize?response_type=code&client_id=nope&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback&scope=photos.read&state=x" },
+        { label: "Authorize dengan client yang tidak dikenal", method: "GET", path: "/authorize?response_type=code&client_id=nope&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback&scope=photos.read&state=x" },
         { label: "JWKS", method: "GET", path: "/.well-known/jwks.json" },
       ]}
     />
 
-    The unknown client got a `400` and a page, not a `302`. The authorization server did not trust the `redirect_uri` enough to send anyone there.
+    Client yang tidak dikenal mendapat `400` dan sebuah halaman, bukan `302`. Authorization server nggak cukup percaya pada `redirect_uri` itu untuk mengirim siapa pun ke sana.
   </Step>
 
-  <Step id="code" title="Code">
-    The authorization endpoint. Notice the order: client and redirect_uri first, then everything that can be reported by redirecting, then the request is parked on the server under a random id until the user has signed in and consented.
+  <Step id="code" title="Kode">
+    Authorization endpoint. Perhatikan urutannya: client dan redirect_uri dulu, lalu semua hal yang bisa dilaporkan lewat redirect, baru request itu diparkir di server dengan id acak sampai user selesai login dan memberi consent.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/as.go#L242-L280"
       ts="labs/03-oauth-pkce/ts/src/as.ts#L109-L140"
       notes={{
-        247: "client_id and redirect_uri are checked first. A failure here is an error page, never a redirect.",
-        254: "Only now can errors go back to the client as ?error=.",
-        260: "PKCE is required: the challenge must be S256 and well formed (lesson 4).",
-        267: "The requested scope must be a subset of what this client may ever be granted.",
-        273: "The request is stored server-side under a random id. The forms carry only that id.",
-        115: "client_id and redirect_uri first: an error page, never a redirect.",
-        121: "Later errors go back as ?error=.",
-        127: "PKCE is required: S256 and a well formed challenge.",
-        131: "The requested scope must be a subset of the client's allowed scope.",
-        136: "Parked server-side under a random id until login and consent.",
+        247: "client_id dan redirect_uri dicek duluan. Gagal di sini berarti halaman error, tidak pernah redirect.",
+        254: "Baru sekarang error boleh dikirim balik ke client sebagai ?error=.",
+        260: "PKCE wajib: challenge harus S256 dan bentuknya benar (lesson 4).",
+        267: "Scope yang diminta harus subset dari yang boleh diberikan ke client ini.",
+        273: "Request disimpan di sisi server dengan id acak. Form hanya membawa id itu.",
+        115: "client_id dan redirect_uri duluan: halaman error, tidak pernah redirect.",
+        121: "Error setelahnya dikirim balik sebagai ?error=.",
+        127: "PKCE wajib: S256 dan challenge dengan bentuk yang benar.",
+        131: "Scope yang diminta harus subset dari scope yang diizinkan untuk client.",
+        136: "Diparkir di server dengan id acak sampai login dan consent.",
       }}
     />
 
-    Redeeming the code. All checks happen in one transaction with the code row locked, so two requests cannot both win.
+    Menukar code. Semua pengecekan terjadi dalam satu transaction dengan baris code dikunci, jadi dua request nggak mungkin menang bersamaan.
 
     <CodeTabs
       go="labs/03-oauth-pkce/go/store.go#L156-L190"
       ts="labs/03-oauth-pkce/ts/src/store.ts#L93-L112"
       notes={{
-        169: "A code that was already used is theft: revoke the tokens it produced and fail.",
-        175: "Expired, a different client or a different redirect_uri: invalid_grant, nothing changes.",
-        184: "Mark the code used and record the token in the same transaction.",
-        100: "Already used: revoke what it produced. The revoke is returned, not thrown, so it commits.",
-        104: "Expired, wrong client or wrong redirect_uri: invalid_grant.",
-        109: "Mark the code used.",
+        169: "Code yang sudah dipakai berarti dicuri: cabut token yang dihasilkannya, lalu gagalkan.",
+        175: "Kedaluwarsa, client berbeda, atau redirect_uri berbeda: invalid_grant, tidak ada yang berubah.",
+        184: "Tandai code sudah dipakai dan catat token dalam transaction yang sama.",
+        100: "Sudah dipakai: cabut apa yang dihasilkannya. Pencabutan di-return, bukan di-throw, supaya ter-commit.",
+        104: "Kedaluwarsa, client salah, atau redirect_uri salah: invalid_grant.",
+        109: "Tandai code sudah dipakai.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "The front channel (browser redirects) carries a one-time code. The back channel (POST /token) carries the token.",
-        "The authorization server authenticates the user and collects consent. The client sees neither password nor consent page.",
-        "A bad client_id or redirect_uri gets an error page, never a redirect (RFC 6749 section 4.1.2.1).",
-        "A code is short-lived, single-use and bound to the client and redirect_uri. Reuse means revoke.",
-        "Token responses are sent with Cache-Control: no-store.",
+        "Front channel (redirect browser) membawa code sekali pakai. Back channel (POST /token) membawa token.",
+        "Authorization server mengautentikasi user dan mengambil consent. Client nggak melihat password maupun halaman consent.",
+        "client_id atau redirect_uri yang salah mendapat halaman error, tidak pernah redirect (RFC 6749 section 4.1.2.1).",
+        "Code berumur pendek, sekali pakai, dan terikat ke client dan redirect_uri. Dipakai ulang berarti cabut.",
+        "Token response dikirim dengan Cache-Control: no-store.",
       ]}
       interview={[
         {
-          q: "Walk me through the authorization code flow.",
-          a: "The client redirects the browser to /authorize with client_id, redirect_uri, scope, state and a PKCE challenge. The user signs in and consents at the authorization server, which redirects back with a short-lived single-use code and the state. The client checks the state and POSTs the code, redirect_uri and PKCE verifier to /token over the back channel, and gets an access token. It sends the token as a Bearer credential to the API.",
+          q: "Jelaskan authorization code flow dari awal sampai akhir.",
+          a: "Client me-redirect browser ke /authorize dengan client_id, redirect_uri, scope, state, dan PKCE challenge. User login dan memberi consent di authorization server, yang lalu me-redirect balik dengan code sekali pakai berumur pendek beserta state. Client mengecek state, lalu mem-POST code, redirect_uri, dan PKCE verifier ke /token lewat back channel, dan mendapat access token. Token itu dikirim ke API sebagai Bearer credential.",
         },
         {
-          q: "Why is there a code at all? Why not return the token in the redirect?",
-          a: "Redirects pass through the browser, where URLs leak to history, logs, referrers and extensions. The code is useless alone: it is short-lived, single-use, bound to the client and redirect_uri, and needs the client's PKCE verifier, so the token itself only travels over a direct TLS call.",
+          q: "Kenapa ada code? Kenapa token nggak langsung dikembalikan di redirect?",
+          a: "Redirect melewati browser, tempat URL bocor ke history, log, referrer, dan extension. Code nggak berguna sendirian: umurnya pendek, sekali pakai, terikat ke client dan redirect_uri, dan butuh PKCE verifier milik client, jadi token sendiri hanya lewat panggilan TLS langsung.",
         },
         {
-          q: "What should the server do when redirect_uri does not match?",
-          a: "Show an error page and not redirect. Redirecting to an unverified URL would be an open redirect, and it could deliver a code to an attacker. The comparison is an exact string match.",
+          q: "Apa yang harus dilakukan server saat redirect_uri tidak cocok?",
+          a: "Tampilkan halaman error dan jangan redirect. Me-redirect ke URL yang belum diverifikasi berarti open redirect, dan bisa mengantarkan code ke attacker. Perbandingannya berupa exact string match.",
         },
         {
-          q: "What happens if an authorization code is used twice?",
-          a: "The second request is rejected with invalid_grant, and the server revokes the tokens issued from the first use, because two parties know the code. A failed attempt with a wrong verifier or redirect_uri changes nothing, so a thief cannot burn the real client's code.",
+          q: "Apa yang terjadi kalau authorization code dipakai dua kali?",
+          a: "Request kedua ditolak dengan invalid_grant, dan server mencabut token yang diterbitkan dari pemakaian pertama, karena dua pihak mengetahui code itu. Percobaan gagal dengan verifier atau redirect_uri yang salah nggak mengubah apa pun, jadi pencuri nggak bisa menghanguskan code milik client yang asli.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain the difference between the front channel and the back channel in the code flow, and say what travels on each."
+      prompt="Jelaskan perbedaan front channel dan back channel di code flow, dan sebutkan apa yang lewat di masing-masing."
       rubric={[
-        "Front channel goes through the user's browser: the authorization request and the redirect back with the code",
-        "Back channel is a direct client-to-server call: the token request and its response",
-        "The code is a short, single-use ticket that is useless alone",
-        "The access token is never put in a URL",
+        "Front channel lewat browser user: authorization request dan redirect balik dengan code",
+        "Back channel adalah panggilan langsung client ke server: token request dan response-nya",
+        "Code adalah tiket pendek sekali pakai yang nggak berguna sendirian",
+        "Access token tidak pernah ditaruh di URL",
       ]}
     />
   </Step>

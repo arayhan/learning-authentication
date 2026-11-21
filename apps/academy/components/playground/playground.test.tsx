@@ -109,9 +109,9 @@ describe("Inspector", () => {
     vi.useFakeTimers();
     wrap(<Inspector lab="01" />);
     act(() => last().fail());
-    expect(screen.getByText("Lab 01 (Go) is not running")).toBeInTheDocument();
+    expect(screen.getByText("Lab 01 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 01 --go")).toBeInTheDocument();
-    expect(screen.getByText("Retrying…")).toBeInTheDocument();
+    expect(screen.getByText("Nyoba nyambung lagi…")).toBeInTheDocument();
     expect(MockEventSource.instances).toHaveLength(1);
     expect(MockEventSource.instances[0].closed).toBe(true);
     act(() => void vi.advanceTimersByTime(3000));
@@ -126,8 +126,8 @@ describe("Inspector", () => {
       last().emit(ev("a", {}, "/first"));
       last().emit(ev("b", { res: { status: 401, headers: {} } }, "/second"));
     });
-    expect(screen.queryByText("Lab 01 (Go) is not running")).not.toBeInTheDocument();
-    const rows = within(screen.getByRole("list", { name: "Requests" })).getAllByRole("button");
+    expect(screen.queryByText("Lab 01 (Go) belum jalan")).not.toBeInTheDocument();
+    const rows = within(screen.getByRole("list", { name: "Daftar request" })).getAllByRole("button");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("/second");
     expect(rows[0]).toHaveTextContent("401");
@@ -161,10 +161,10 @@ describe("Inspector", () => {
       last().open();
       last().emit(ev("a"));
     });
-    await userEvent.click(screen.getByRole("button", { name: /clear/i }));
-    expect(screen.queryByRole("list", { name: "Requests" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /hapus/i }));
+    expect(screen.queryByRole("list", { name: "Daftar request" })).not.toBeInTheDocument();
     act(() => last().emit(ev("a")));
-    expect(screen.queryByRole("list", { name: "Requests" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Daftar request" })).not.toBeInTheDocument();
   });
 
   it("switching impl closes the old EventSource and opens the new port", async () => {
@@ -241,14 +241,14 @@ describe("LabTasks", () => {
       last().emit(login("2"));
     });
     act(() => last().emit(login("3")));
-    await waitFor(() => expect(screen.getByText(/\(done\)/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/\(selesai\)/)).toBeInTheDocument());
     expect(server.posts).toEqual([{ kind: "lab-task", ref: "m1-l1/login" }]);
   });
 
   it("never re-sends a task that is already completed", async () => {
     const server = fakeServer(["m1-l1/login"]);
     wrap(<LabTasks />, ["m1-l1/login"]);
-    expect(screen.getByText(/\(done\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(selesai\)/)).toBeInTheDocument();
     act(() => {
       last().open();
       last().emit(login("1"));
@@ -265,11 +265,11 @@ describe("LabTasks", () => {
       last().emit(login("1"));
     });
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(/\(not done\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(belum\)/)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
     await userEvent.type(screen.getByLabelText("Password"), "password123");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    await waitFor(() => expect(screen.getByText(/\(done\)/)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Login" }));
+    await waitFor(() => expect(screen.getByText(/\(selesai\)/)).toBeInTheDocument());
     expect(server.posts).toEqual([{ kind: "lab-task", ref: "m1-l1/login" }]);
   });
 
@@ -277,7 +277,7 @@ describe("LabTasks", () => {
     fakeServer();
     wrap(<LabTasks />);
     act(() => last().fail());
-    expect(screen.getByText("Lab 01 (Go) is not running")).toBeInTheDocument();
+    expect(screen.getByText("Lab 01 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 01 --go")).toBeInTheDocument();
   });
 
@@ -301,7 +301,7 @@ describe("LabConsole", () => {
         ]}
       />,
     );
-    expect(screen.getByText("vulnerable mode")).toBeInTheDocument();
+    expect(screen.getByText("mode vulnerable")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
     const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
     const [url, init] = labCalls()[0];
@@ -336,13 +336,13 @@ describe("LabConsole", () => {
     );
     const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
     // before any login: empty token and a hint
-    expect(screen.getByText("Log in first to get a CSRF token")).toBeInTheDocument();
+    expect(screen.getByText("Login dulu buat dapetin CSRF token")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Transfer/ }));
     expect(labCalls()[0][1].headers).toMatchObject({ "X-CSRF-Token": "" });
 
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
     await screen.findByText(/tok-123/);
-    expect(screen.queryByText("Log in first to get a CSRF token")).not.toBeInTheDocument();
+    expect(screen.queryByText("Login dulu buat dapetin CSRF token")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Whoami/ })); // a response without csrfToken keeps the token
     await userEvent.click(screen.getByRole("button", { name: /Transfer/ }));
     const init = labCalls()[3][1];
@@ -367,12 +367,12 @@ describe("LabConsole", () => {
       />,
     );
     const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
-    expect(screen.getByText("Log in first")).toBeInTheDocument();
+    expect(screen.getByText("Login dulu")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Profile/ }));
     expect(labCalls()[0][1].headers).toMatchObject({ Authorization: "Bearer " });
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
     await screen.findByText(/jwt-abc/);
-    expect(screen.queryByText("Log in first")).not.toBeInTheDocument();
+    expect(screen.queryByText("Login dulu")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Profile/ })); // a response without access_token keeps it
     await userEvent.click(screen.getByRole("button", { name: /Profile/ }));
     expect(labCalls()[3][1].headers).toMatchObject({ Authorization: "Bearer jwt-abc" });
@@ -392,11 +392,11 @@ describe("LabConsole", () => {
       />,
     );
     const emails = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost")).map(([, i]) => JSON.parse(i.body as string).email as string);
-    expect(screen.getByText("Register first")).toBeInTheDocument();
+    expect(screen.getByText("Register dulu")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
     expect(emails()).toEqual([""]); // nothing registered yet
     await userEvent.click(screen.getByRole("button", { name: /Register/ }));
-    expect(screen.queryByText("Register first")).not.toBeInTheDocument();
+    expect(screen.queryByText("Register dulu")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
     const [, first, again] = emails();
     expect(first).toMatch(/^learner-[0-9a-f]{8}@example\.com$/);
@@ -413,7 +413,7 @@ describe("LabConsole", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
     wrap(<LabConsole lab="02" actions={[{ label: "JWKS", method: "GET", path: "/jwks.json" }]} />);
     await userEvent.click(screen.getByRole("button", { name: /JWKS/ }));
-    expect(await screen.findByText("Lab 02 (Go) is not running")).toBeInTheDocument();
+    expect(await screen.findByText("Lab 02 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 02 --go")).toBeInTheDocument();
   });
 });

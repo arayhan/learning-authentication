@@ -1,9 +1,9 @@
 import { Info, ShieldAlert, TriangleAlert } from "lucide-react";
 
 const TYPES = {
-  info: { Icon: Info, label: "Note", style: "border-l-brand" },
-  warn: { Icon: TriangleAlert, label: "Heads up", style: "border-l-amber-500" },
-  security: { Icon: ShieldAlert, label: "Security", style: "border-l-destructive" },
+  info: { Icon: Info, label: "Catatan", style: "border-l-brand" },
+  warn: { Icon: TriangleAlert, label: "Awas", style: "border-l-amber-500" },
+  security: { Icon: ShieldAlert, label: "Keamanan", style: "border-l-destructive" },
 } as const;
 
 export function Callout({ type = "info", children }: { type?: keyof typeof TYPES; children: React.ReactNode }) {

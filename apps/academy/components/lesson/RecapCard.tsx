@@ -3,7 +3,7 @@ export function RecapCard({ bullets, interview = [] }: { bullets: string[]; inte
   return (
     <div className="max-w-[68ch] space-y-5 rounded-lg border p-5">
       <div>
-        <h3 className="mb-2 text-sm font-semibold">Key takeaways</h3>
+        <h3 className="mb-2 text-sm font-semibold">Poin penting</h3>
         <ul className="list-disc space-y-1.5 pl-5 text-sm">
           {bullets.map((b) => (
             <li key={b}>{b}</li>
@@ -12,7 +12,7 @@ export function RecapCard({ bullets, interview = [] }: { bullets: string[]; inte
       </div>
       {interview.length > 0 && (
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Interview check</h3>
+          <h3 className="mb-2 text-sm font-semibold">Cek wawancara</h3>
           <div className="divide-y rounded-lg border">
             {interview.map(({ q, a }) => (
               <details key={q} className="group px-3 py-2 text-sm">

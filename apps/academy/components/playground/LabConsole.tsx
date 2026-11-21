@@ -102,15 +102,15 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
             {a.label}
             {a.vulnerable && (
               <span className="rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                vulnerable mode
+                mode vulnerable
               </span>
             )}
           </Button>
         ))}
       </div>
-      {!email && actions.some((a) => uses(a, EMAIL)) && <p className="text-xs text-muted-foreground">Register first</p>}
-      {!token && actions.some((a) => uses(a, CSRF)) && <p className="text-xs text-muted-foreground">Log in first to get a CSRF token</p>}
-      {!accessToken && actions.some((a) => uses(a, ACCESS)) && <p className="text-xs text-muted-foreground">Log in first</p>}
+      {!email && actions.some((a) => uses(a, EMAIL)) && <p className="text-xs text-muted-foreground">Register dulu</p>}
+      {!token && actions.some((a) => uses(a, CSRF)) && <p className="text-xs text-muted-foreground">Login dulu buat dapetin CSRF token</p>}
+      {!accessToken && actions.some((a) => uses(a, ACCESS)) && <p className="text-xs text-muted-foreground">Login dulu</p>}
       {result === "offline" && <OfflineCard lab={lab} impl={impl} retrying={false} />}
       {result && result !== "offline" && (
         <div aria-live="polite" className="space-y-2 rounded-md border bg-muted/30 p-3 font-mono text-xs">

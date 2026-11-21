@@ -1,152 +1,152 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    In Module 1 the server remembered you: a cookie pointed at a row in a table. Now imagine the server remembers nothing, and you simply hand it a small signed note that says who you are. Any server that trusts the signer can read the note and believe it.
+  <Step id="hook" title="Pembuka">
+    Di Module 1, server yang **mengingat** kamu: cookie menunjuk ke satu baris di tabel. Sekarang bayangkan server nggak mengingat apa-apa, dan kamu cukup menyodorkan secarik catatan bertanda tangan yang bilang kamu siapa. Server mana pun yang percaya sama penandatangannya bisa baca catatan itu dan langsung percaya.
 
-    That note is a **JSON Web Token (JWT)**, and it is everywhere: API calls, single sign-on, mobile apps. It is also misunderstood more often than almost anything in authentication.
+    Catatan itu namanya **JSON Web Token (JWT)**, dan dia ada di mana-mana: API call, single sign-on, aplikasi mobile. Dia juga salah satu hal yang paling sering disalahpahami di dunia authentication.
 
-    <Analogy title="The concert wristband">
-      Anyone can look at your wristband and read the date and the zone printed on it. Nobody can make a new one, because the print is hard to copy. The guard never phones the box office: the wristband itself is the proof.
+    <Analogy title="Gelang tiket konser">
+      Siapa pun bisa melirik gelang kamu dan membaca tanggal serta zona yang tercetak di situ. Tapi nggak ada yang bisa bikin gelang baru, karena cetakannya susah ditiru. Petugas gate nggak perlu telepon box office: gelangnya sendiri sudah jadi buktinya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    A JWT is three pieces of text joined by dots: **header.payload.signature**. This is the compact form of a JSON Web Signature (JWS, RFC 7515), and the claims format is defined in RFC 7519.
+  <Step id="concept" title="Konsep">
+    JWT itu tiga potong teks yang disambung titik: **header.payload.signature**. Ini bentuk compact dari JSON Web Signature (JWS, RFC 7515), sedangkan format claims-nya didefinisikan di RFC 7519.
 
-    | Part | What it holds | Example from the lab |
+    | Bagian | Isinya | Contoh dari lab |
     |---|---|---|
-    | **Header** | How the token was signed | `{"alg":"RS256","typ":"JWT","kid":"k3Hq9ZmB1vW8eYrT"}` |
-    | **Payload** | The **claims**: statements about the user and the token | `{"iss":"http://localhost:4102","sub":"6f1c…","exp":1767225900,…}` |
-    | **Signature** | A signature over `base64url(header) + "." + base64url(payload)` | 256 bytes for RS256 |
+    | **Header** | Cara token ini di-sign | `{"alg":"RS256","typ":"JWT","kid":"k3Hq9ZmB1vW8eYrT"}` |
+    | **Payload** | **Claims**: pernyataan soal user dan token | `{"iss":"http://localhost:4102","sub":"6f1c…","exp":1767225900,…}` |
+    | **Signature** | Signature atas `base64url(header) + "." + base64url(payload)` | 256 byte untuk RS256 |
 
-    Header and payload are JSON, encoded with **base64url**. That is an encoding, not encryption: anyone holding the token can read both. The signature is what makes the token trustworthy. Change one byte of the payload and the signature no longer matches.
+    Header dan payload itu JSON yang di-encode pakai **base64url**. Itu encoding, bukan enkripsi: siapa pun yang pegang token bisa membaca keduanya. Yang bikin token bisa dipercaya adalah signature-nya. Ubah satu byte saja di payload, signature langsung nggak cocok.
 
     <SequenceFlow flow={flows.statefulVsStateless} />
 
-    Two properties follow, and every lesson in this module builds on them.
+    Dari sini muncul dua sifat, dan setiap lesson di module ini dibangun di atasnya.
 
-    1. **Self-contained.** The API verifies the token with a key and reads the claims from the token itself. There is no session lookup.
-    2. **Bearer.** Whoever holds the token is treated as the user. The signature proves who *issued* it, not who is *presenting* it.
+    1. **Self-contained.** API memverifikasi token pakai key dan membaca claims langsung dari token. Nggak ada lookup session.
+    2. **Bearer.** Siapa pun yang memegang token dianggap sebagai user-nya. Signature membuktikan siapa yang *menerbitkan*, bukan siapa yang *menyodorkan*.
 
     <Callout type="security">
-      A signed JWT is **readable by everyone who holds it**. Never put passwords, secrets or sensitive personal data in the payload. If you need confidentiality, use an encrypted token (JWE) or keep the data on the server and put only an id in the token.
+      JWT yang di-sign **bisa dibaca semua orang yang memegangnya**. Jangan pernah taruh password, secret, atau data pribadi yang sensitif di payload. Kalau butuh kerahasiaan, pakai token terenkripsi (JWE) atau simpan datanya di server dan taruh id-nya saja di token.
     </Callout>
   </Step>
 
   <Step id="claims" title="Claims">
-    The payload is a set of claims. A few names are **registered** (RFC 7519 section 4.1), and a verifier is expected to understand them.
+    Payload itu kumpulan claims. Beberapa nama bersifat **registered** (RFC 7519 section 4.1), dan verifier diharapkan paham maknanya.
 
-    | Claim | Meaning | A verifier must |
+    | Claim | Arti | Yang harus dilakukan verifier |
     |---|---|---|
-    | `iss` | **Issuer**: who made the token | Check it equals the issuer it trusts |
-    | `sub` | **Subject**: who the token is about | Use it as the user id |
-    | `aud` | **Audience**: which API it is for | Reject it if the API is not listed |
-    | `exp` | **Expiration** time, in Unix seconds | Reject it after this moment |
-    | `iat` | **Issued at** | Treat it as information |
-    | `nbf` | **Not before** | Reject it before this moment |
-    | `jti` | **JWT ID**, unique per token | Use it for logging or a deny list |
+    | `iss` | **Issuer**: siapa yang membuat token | Cek sama dengan issuer yang dipercaya |
+    | `sub` | **Subject**: token ini tentang siapa | Pakai sebagai user id |
+    | `aud` | **Audience**: token ini untuk API mana | Tolak kalau API-nya nggak tercantum |
+    | `exp` | Waktu **expiration**, dalam detik Unix | Tolak setelah saat ini |
+    | `iat` | **Issued at**: kapan diterbitkan | Anggap sebagai informasi |
+    | `nbf` | **Not before**: baru berlaku setelah | Tolak sebelum saat ini |
+    | `jti` | **JWT ID**, unik per token | Pakai untuk logging atau deny list |
 
-    The header has its own important field: **`kid`** (key id), which says which of the issuer's keys signed the token. Lesson 2 uses it. **`alg`** names the signature algorithm. It is attacker-controlled input, and lesson 5 shows what happens when a verifier believes it.
+    Header juga punya field penting sendiri: **`kid`** (key id), yang menunjukkan key mana dari issuer yang dipakai men-sign token. Lesson 2 memakainya. **`alg`** menyebut algoritma signature. Ini input yang dikontrol attacker, dan lesson 5 menunjukkan apa yang terjadi kalau verifier percaya begitu saja.
 
-    Lab 02 adds one custom claim, `email`. Custom claims are fine, but remember the token is readable and cannot be taken back: keep them few and non-sensitive.
+    Lab 02 menambahkan satu custom claim, `email`. Custom claim boleh-boleh saja, tapi ingat token itu bisa dibaca dan nggak bisa ditarik kembali: jumlahnya sedikit saja dan jangan yang sensitif.
 
     <Callout type="warn">
-      The lab puts `exp` five minutes after `iat`. Lifetimes are a security setting, not a convenience. Because a self-contained token cannot be recalled, a short life is the main thing that limits what a stolen token is worth.
+      Di lab, `exp` diset lima menit setelah `iat`. Masa berlaku itu pengaturan keamanan, bukan soal kenyamanan. Karena token self-contained nggak bisa ditarik kembali, umur yang pendek adalah pembatas utama nilai token yang dicuri.
     </Callout>
   </Step>
 
-  <Step id="tradeoff" title="Sessions or tokens?">
-    Neither one is simply better. They move the state to a different place.
+  <Step id="tradeoff" title="Session atau token?">
+    Nggak ada yang otomatis lebih baik. Keduanya cuma memindahkan state ke tempat yang berbeda.
 
     | | Server session (Module 1) | JWT access token |
     |---|---|---|
-    | Where the truth lives | A row in the server's session table | Inside the signed token |
-    | Check on each request | Look up the session | Verify the signature and claims |
-    | Revoke at once | Yes, delete the row | Not until `exp` (lesson 6) |
-    | Several services | They must share the session store | Each needs only the public key |
-    | Size on the wire | A short random id | Hundreds of bytes, sent on every request |
-    | Stale data | Always current | Claims are frozen at issue time |
+    | Sumber kebenaran | Satu baris di tabel session server | Di dalam token yang di-sign |
+    | Pengecekan tiap request | Lookup session | Verifikasi signature dan claims |
+    | Revoke seketika | Bisa, tinggal hapus barisnya | Nggak bisa sampai `exp` (lesson 6) |
+    | Banyak service | Harus berbagi session store | Masing-masing cukup punya public key |
+    | Ukuran di jaringan | Id acak yang pendek | Ratusan byte, dikirim di setiap request |
+    | Data basi | Selalu terbaru | Claims dibekukan saat token diterbitkan |
 
-    JWTs make the most sense when **more than one service** has to trust the same login, as with an identity provider and several APIs, or when you want verification with no shared database. For a single web app talking to its own backend, a plain server session is often simpler and safer.
+    JWT paling masuk akal kalau **lebih dari satu service** harus percaya pada login yang sama, misalnya identity provider dengan beberapa API, atau kalau kamu mau verifikasi tanpa database bersama. Untuk satu web app yang ngobrol dengan backend-nya sendiri, server session biasa sering lebih simpel dan lebih aman.
 
     <Callout type="info">
-      Worth asking of your own system: when **sso-backend** issues a token that **core-api** accepts, which claims does core-api actually check, and is that the same list as the table above?
+      Coba tanyakan ke sistem kamu sendiri: waktu **sso-backend** menerbitkan token yang diterima **core-api**, claims mana yang benar-benar dicek core-api, dan apakah daftarnya sama dengan tabel di atas?
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
-  <Step id="decode" title="Decode a token">
-    Below is a real token in the lab's format, built with a throwaway key. Decoding it needs no key and checks nothing, so it works even though its `exp` is long gone.
+  <Step id="decode" title="Decode sebuah token">
+    Di bawah ini token asli dengan format yang dipakai lab, dibuat pakai key sekali pakai. Decode nggak butuh key dan nggak mengecek apa pun, jadi tetap jalan walau `exp`-nya sudah lama lewat.
 
-    1. Spot the three colours: header, payload, signature.
-    2. Read the explanation under each claim (hover also shows it), and look at how `exp` is shown as relative time.
-    3. Replace the text with garbage, or with `a.b.c`, and see the inline error instead of a crash.
+    1. Perhatikan tiga warnanya: header, payload, signature.
+    2. Baca penjelasan di bawah tiap claim (hover juga menampilkannya), dan lihat bagaimana `exp` ditampilkan sebagai waktu relatif.
+    3. Ganti teksnya dengan sembarang karakter, atau `a.b.c`, lalu lihat error inline muncul, bukan crash.
 
     <TokenDecoder defaultToken="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImszSHE5Wm1CMXZXOGVZclQifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjQxMDIiLCJhdWQiOiJsYWIwMi1hcGkiLCJzdWIiOiI2ZjFjMmI5ZS0zYTRkLTRlOGYtOWIxYS03YzVkMmUwZjhhMzQiLCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjU5MDAsImp0aSI6IlhrM3E5Wm1CMXZXOGVZclQ1dUxwQTdzRDBmR2hKY040aU9hRTZiUXdWeVUifQ.CuGey27Ie14YL8uqlMkjrCUvVECt6nDd3iZ6EFC_cofWogIgkOrRN7gjzi21UEXXRuakSzfYSFE8d4aqWWNXAEe3BAdzyxdkd6hp66gXfat5Pfb1ynDtmqga2Vn9zi3DlxNpNqHgF1XyzrMHOO6xKiM9at_MByW_OSwdvkyh080odZoFDV9yRFezLzhhVtxBegtSd_bdXmoniQTExoMwD8snHVvxI3tj-tIRxO-x6gIi5IODrb1tJ4-PxDRhn60sv4iqofrDGRU3K8J0WkTRhjK812h2NMEITMukC2KnWL7Sorcuwd186gFHtXIWKYbiB-TqXPn4iNwCOHuwXFmfag" />
 
-    Lesson 2 lets you verify a token you got from the lab itself.
+    Di lesson 2, kamu bisa memverifikasi token yang kamu ambil dari lab sendiri.
   </Step>
 
-  <Step id="code" title="Code">
-    Here is how the lab builds the token you just decoded. It signs an RS256 token with a `kid` header and the registered claims, and it sets `exp` five minutes after `iat`.
+  <Step id="code" title="Kode">
+    Begini cara lab membuat token yang barusan kamu decode. Dia men-sign token RS256 dengan header `kid` dan registered claims, lalu men-set `exp` lima menit setelah `iat`.
 
     <CodeTabs
       go="labs/02-jwt/go/tokens.go#L24-L33"
       ts="labs/02-jwt/ts/src/tokens.ts#L11-L23"
       notes={{
-        28: "iss and aud name the issuer and the API this token is for.",
-        29: "iat, exp (now + 300 seconds) and a random jti.",
-        31: "The kid header tells verifiers which key in the JWKS signed this.",
-        15: "The header carries alg, typ and kid.",
-        20: "exp is five minutes after iat.",
+        28: "iss dan aud menyebut issuer dan API tujuan token ini.",
+        29: "iat, exp (sekarang + 300 detik), dan jti acak.",
+        31: "Header kid memberi tahu verifier key mana di JWKS yang dipakai men-sign ini.",
+        15: "Header berisi alg, typ, dan kid.",
+        20: "exp adalah lima menit setelah iat.",
       }}
     />
 
-    Note what is **not** here: no user lookup, no table write for this token. Signing is a pure function of the claims and the private key.
+    Perhatikan apa yang **nggak** ada di sini: nggak ada user lookup, nggak ada tulis ke tabel untuk token ini. Signing itu fungsi murni dari claims dan private key.
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "A JWT is header.payload.signature: base64url JSON plus a signature (RFC 7519, RFC 7515).",
-        "The payload is readable by anyone who holds the token. Signed does not mean secret.",
-        "The signature proves the issuer made it and nothing changed. It does not prove who is presenting it: JWTs are bearer tokens.",
-        "A verifier checks signature, iss, aud and exp. kid picks the key, alg must be pinned by the verifier.",
-        "Self-contained tokens trade easy revocation for not needing a shared session store.",
+        "JWT itu header.payload.signature: JSON base64url plus signature (RFC 7519, RFC 7515).",
+        "Payload bisa dibaca siapa pun yang memegang token. Signed bukan berarti secret.",
+        "Signature membuktikan issuer yang membuatnya dan isinya nggak berubah. Dia tidak membuktikan siapa yang menyodorkannya: JWT itu bearer token.",
+        "Verifier mengecek signature, iss, aud, dan exp. kid memilih key, sedangkan alg harus di-pin oleh verifier.",
+        "Token self-contained menukar kemudahan revoke dengan tidak butuh session store bersama.",
       ]}
       interview={[
         {
-          q: "What is a JWT and what is in it?",
-          a: "A compact, URL-safe token of three base64url parts: a header (algorithm and key id), a payload of claims such as iss, sub, aud and exp, and a signature over the first two parts. It is a JWS, and the issuer signs it so any verifier holding the key can trust it without a database lookup.",
+          q: "JWT itu apa dan isinya apa saja?",
+          a: "Token compact yang aman untuk URL, terdiri dari tiga bagian base64url: header (algoritma dan key id), payload berisi claims seperti iss, sub, aud, dan exp, serta signature atas dua bagian pertama. Dia sebuah JWS, di-sign oleh issuer, sehingga verifier mana pun yang punya key bisa mempercayainya tanpa lookup ke database.",
         },
         {
-          q: "Is a JWT encrypted?",
-          a: "No, a normal signed JWT is only encoded. Anyone who holds it can read the claims. The signature gives integrity and authenticity, not confidentiality. An encrypted JWT (JWE) exists, but most APIs use signed tokens and keep the payload free of sensitive data.",
+          q: "Apakah JWT terenkripsi?",
+          a: "Tidak, JWT yang di-sign biasa itu cuma di-encode. Siapa pun yang memegangnya bisa membaca claims. Signature memberi integritas dan autentisitas, bukan kerahasiaan. JWT terenkripsi (JWE) memang ada, tapi kebanyakan API memakai token yang di-sign dan menjaga payload bebas dari data sensitif.",
         },
         {
-          q: "Sessions or JWTs?",
-          a: "Sessions keep the state on the server: simple, instantly revocable, but they need a shared store when several services are involved. JWTs carry the state in the token: services verify offline, but you cannot revoke before expiry and claims go stale. For a single web app a session is often enough. For many services, a JWT from one identity provider fits well.",
+          q: "Session atau JWT?",
+          a: "Session menyimpan state di server: simpel, bisa di-revoke seketika, tapi butuh store bersama kalau ada banyak service. JWT membawa state di dalam token: service bisa verifikasi offline, tapi kamu nggak bisa revoke sebelum expired dan claims bisa basi. Untuk satu web app, session sering sudah cukup. Untuk banyak service, JWT dari satu identity provider lebih cocok.",
         },
         {
-          q: "Which claims must an API validate?",
-          a: "The signature with a pinned algorithm, exp so expired tokens are rejected, iss so only the trusted issuer counts, and aud so a token made for another API is rejected. This is the guidance of RFC 8725, the JWT best current practices.",
+          q: "Claims mana yang wajib divalidasi API?",
+          a: "Signature dengan algoritma yang di-pin, exp supaya token expired ditolak, iss supaya hanya issuer terpercaya yang dihitung, dan aud supaya token yang dibuat untuk API lain ditolak. Ini panduan dari RFC 8725, JWT best current practices.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why a signed JWT can be read by anyone, yet cannot be forged, and what that means for what you put in it."
+      prompt="Jelaskan ke teman satu tim kenapa JWT yang di-sign bisa dibaca siapa saja tapi tetap nggak bisa dipalsukan, dan apa artinya buat isi yang kamu taruh di dalamnya."
       rubric={[
-        "Header and payload are only base64url encoded, so anyone can decode them",
-        "The signature covers header and payload, so changing either breaks verification",
-        "Only the holder of the signing key can make a valid token",
-        "So no secrets in the payload, and keep claims few and non-sensitive",
+        "Header dan payload cuma di-encode base64url, jadi siapa pun bisa decode",
+        "Signature mencakup header dan payload, jadi mengubah salah satunya merusak verifikasi",
+        "Hanya pemegang signing key yang bisa membuat token valid",
+        "Jadi jangan taruh secret di payload, dan claims dijaga sedikit serta nggak sensitif",
       ]}
     />
   </Step>

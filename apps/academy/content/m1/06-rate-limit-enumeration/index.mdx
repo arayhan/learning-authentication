@@ -2,63 +2,63 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Your login endpoint is a free password-guessing machine unless you decide otherwise. Anyone on the internet can call it, as fast as their connection allows.
+    Endpoint login kamu adalah mesin tebak password gratisan, kecuali kamu memutuskan lain. Siapa pun di internet bisa memanggilnya, secepat koneksi mereka mengizinkan.
 
-    <Analogy title="The bouncer">
-      A good bouncer turns people away after a few tries, and says "not tonight" to everyone in exactly the same way. They never reveal who is on the guest list.
+    <Analogy title="Satpam kompleks">
+      Satpam yang baik menolak orang setelah beberapa kali coba, dan bilang "lain kali ya, Pak" ke semua orang dengan cara yang persis sama. Ia tidak pernah membocorkan siapa saja yang ada di daftar tamu.
     </Analogy>
   </Step>
 
-  <Step id="guessing" title="Guessing attacks">
-    Three flavours of online guessing, and they need different answers.
+  <Step id="guessing" title="Serangan tebak-tebakan">
+    Ada tiga jenis tebakan online, dan masing-masing butuh jawaban yang berbeda.
 
-    | Attack | What the attacker does | What stops it |
+    | Serangan | Yang dilakukan attacker | Yang menghentikannya |
     |---|---|---|
-    | **Brute force** | Many guesses against one account | A failure limit per account |
-    | **Password spraying** | One or two common passwords against thousands of accounts | Limits per IP or device, plus watching the global failure rate |
-    | **Credential stuffing** | Email and password pairs leaked from other sites | Breached-password checks, MFA, limits per IP |
+    | **Brute force** | Banyak tebakan ke satu akun | Batas kegagalan per akun |
+    | **Password spraying** | Satu atau dua password umum ke ribuan akun | Batas per IP atau perangkat, plus memantau tingkat kegagalan global |
+    | **Credential stuffing** | Pasangan email dan password yang bocor dari situs lain | Pengecekan breached-password, MFA, batas per IP |
 
     <SequenceFlow flow={flows.bruteForce} />
 
-    A sensible limiter has a few properties:
+    Rate limiter yang masuk akal punya beberapa sifat:
 
-    - **It runs before the password check.** After the limit is hit, even the correct password is refused. Otherwise the attacker keeps guessing until they win.
-    - **It is time-boxed.** The lab allows 5 failures in a sliding 15 minutes, then answers `429` with a `Retry-After` header. A permanent lock hands attackers a way to lock out any user they like.
-    - **It covers unknown emails too.** If only real accounts were limited, the limiter itself would reveal which accounts exist.
-    - **It is atomic.** Under 10 parallel guesses, all of them can read "0 failures" before any writes one. The lab takes a per-email lock inside a database transaction so that the limit binds even under concurrency.
+    - **Jalan sebelum pengecekan password.** Setelah batas tercapai, password yang benar pun ditolak. Kalau tidak, attacker terus menebak sampai menang.
+    - **Dibatasi waktu.** Lab ini mengizinkan 5 kegagalan dalam 15 menit sliding, lalu membalas `429` dengan header `Retry-After`. Lock permanen memberi attacker cara untuk mengunci user mana pun yang mereka mau.
+    - **Mencakup email yang tidak dikenal juga.** Kalau hanya akun asli yang dibatasi, limiter-nya sendiri akan membocorkan akun mana yang ada.
+    - **Atomic.** Dengan 10 tebakan paralel, semuanya bisa membaca "0 kegagalan" sebelum ada yang menulis. Lab ini mengambil lock per email di dalam transaksi database supaya batasnya tetap mengikat walau ada concurrency.
 
-    NIST SP 800-63B requires limiting consecutive failed attempts per account (the ceiling it names is 100), and recommends other defenses besides, such as CAPTCHAs, throttling and breach-list checks. The lab's 5 per 15 minutes is stricter, which suits a demo.
+    NIST SP 800-63B mewajibkan pembatasan percobaan gagal berturut-turut per akun (batas atas yang disebut adalah 100), dan merekomendasikan pertahanan lain, seperti CAPTCHA, throttling, dan pengecekan breach-list. Batas lab 5 per 15 menit lebih ketat, cocok untuk demo.
 
     <Callout type="info">
-      Worth asking: your **sso-backend** login presumably fronts platforms A, B and C, which would make it the most valuable guessing target in the system. Does it have both per-account and per-IP limits, and does anyone get alerted on a spike of failures?
+      Coba tanya: login **sso-backend** kamu kemungkinan melayani platform A, B, dan C, yang menjadikannya target tebakan paling berharga di seluruh sistem. Apakah ia punya batas per akun dan per IP, dan apakah ada yang diberi alert saat kegagalan melonjak?
     </Callout>
   </Step>
 
   <Step id="enumeration" title="Account enumeration">
-    **Enumeration** means learning which accounts exist. It matters because it gives credential stuffers a head start and gives phishers a target list.
+    **Enumeration** artinya mencari tahu akun mana yang ada. Ini penting karena memberi credential stuffer start lebih awal dan memberi phisher daftar target.
 
-    The leaks hide in many places:
+    Kebocorannya bersembunyi di banyak tempat:
 
-    - **Messages.** "No such user" versus "wrong password".
-    - **Status codes.** `404` versus `401`.
-    - **Timing.** An unknown email returns instantly while a known one spends 40 ms hashing.
-    - **Other endpoints.** Password reset ("no account with that email") and registration ("email already registered").
+    - **Pesan.** "No such user" versus "wrong password".
+    - **Status code.** `404` versus `401`.
+    - **Timing.** Email yang tidak dikenal kembali seketika sementara yang dikenal menghabiskan 40 ms untuk hashing.
+    - **Endpoint lain.** Reset password ("tidak ada akun dengan email itu") dan registrasi ("email sudah terdaftar").
 
-    The login fix has two halves. First, one **generic response** for every failure: `401` with `{"error":"invalid credentials"}`, byte for byte. Second, **equal work**: for an unknown email the server still verifies the password against a dummy hash, so both paths cost about the same.
+    Perbaikan di login punya dua bagian. Pertama, satu **response generik** untuk semua kegagalan: `401` dengan `{"error":"invalid credentials"}`, byte demi byte. Kedua, **kerja yang sama**: untuk email yang tidak dikenal server tetap memverifikasi password terhadap dummy hash, jadi kedua jalur biayanya hampir sama.
 
     <Callout type="warn">
-      The lab's `/register` does answer `409` for an existing email, which leaks that the account exists. Signup is hard to make fully uniform. A real product usually answers "check your email" either way and sends a message that says what happened. For password reset, always reply "if an account exists, we have sent an email".
+      `/register` di lab ini memang membalas `409` untuk email yang sudah ada, yang membocorkan bahwa akun itu ada. Signup sulit dibuat seragam sepenuhnya. Produk nyata biasanya membalas "cek email kamu" apa pun hasilnya dan mengirim pesan yang menjelaskan apa yang terjadi. Untuk reset password, selalu balas "kalau akun itu ada, kami sudah mengirim email".
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Break your own limiter, then compare two kinds of failure. Register creates a fresh account each time, so a lockout only affects the account you are testing and you can rerun this as often as you like.
+    Jebol limiter kamu sendiri, lalu bandingkan dua jenis kegagalan. Register membuat akun baru setiap kali, jadi lockout hanya memengaruhi akun yang sedang kamu uji dan kamu bisa mengulang ini sesering yang kamu mau.
 
     <LabTasks />
 
@@ -66,57 +66,57 @@ import { flows } from "@/content/flows";
       lab="01"
       actions={[
         { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
-        { label: "Wrong password", method: "POST", path: "/login", body: { email: "{{email}}", password: "not-the-password" } },
-        { label: "Unknown email", method: "POST", path: "/login", body: { email: "ghost@example.com", password: "not-the-password" } },
-        { label: "Correct password", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
+        { label: "Password salah", method: "POST", path: "/login", body: { email: "{{email}}", password: "not-the-password" } },
+        { label: "Email tidak dikenal", method: "POST", path: "/login", body: { email: "ghost@example.com", password: "not-the-password" } },
+        { label: "Password benar", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
       ]}
     />
 
-    1. Click **Wrong password**, then **Unknown email**. Both return `401` with exactly `{"error":"invalid credentials"}`. Compare the bodies in the Inspector.
-    2. Click **Wrong password** five more times. The sixth attempt inside the window is refused with `429` and a `Retry-After` header.
-    3. Click **Correct password**. It is refused with `429` as well: the limit is checked before the password.
+    1. Klik **Password salah**, lalu **Email tidak dikenal**. Keduanya mengembalikan `401` dengan persis `{"error":"invalid credentials"}`. Bandingkan body-nya di Inspector.
+    2. Klik **Password salah** lima kali lagi. Percobaan keenam di dalam window ditolak dengan `429` dan header `Retry-After`.
+    3. Klik **Password benar**. Ia juga ditolak dengan `429`: batasnya dicek sebelum password.
 
     <Callout type="warn">
-      That account is now locked for up to 15 minutes, and the console shows the exact wait in `Retry-After`. That is the intended behaviour, and also the price of any account-based limit: an attacker can lock a victim out, which is why the window is short.
+      Akun itu sekarang terkunci sampai 15 menit, dan console menampilkan lama tunggu yang tepat di `Retry-After`. Itu perilaku yang disengaja, sekaligus harga dari setiap batas berbasis akun: attacker bisa mengunci korban, makanya window-nya pendek.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    The whole decision lives in one function. It takes a lock for the email, counts recent failures, refuses if there are too many, verifies the password, and records a failure otherwise, all in one transaction.
+  <Step id="code" title="Kode">
+    Seluruh keputusan ada di satu fungsi. Ia mengambil lock untuk email, menghitung kegagalan terbaru, menolak kalau terlalu banyak, memverifikasi password, dan mencatat kegagalan kalau gagal, semuanya dalam satu transaksi.
 
     <CodeTabs
       go="labs/01-sessions/go/store.go#L67-L106"
       ts="labs/01-sessions/ts/src/store.ts#L45-L66"
       notes={{
-        79: "An advisory lock per email: concurrent guesses are processed one at a time.",
-        83: "Failures in the last 15 minutes, plus how long until the oldest one expires (Retry-After).",
-        90: "The limit is enforced before the password is touched.",
-        99: "Only now is the password verified.",
-        102: "A failure is recorded, even for an unknown email.",
-        55: "The same per-email advisory lock in TypeScript.",
-        56: "Count the failures in the window.",
-        60: "Blocked: the limit is checked before the password.",
-        62: "Verify the password.",
-        63: "Record the failure.",
+        79: "Advisory lock per email: tebakan yang bersamaan diproses satu per satu.",
+        83: "Kegagalan dalam 15 menit terakhir, plus berapa lama sampai yang tertua kedaluwarsa (Retry-After).",
+        90: "Batas ditegakkan sebelum password disentuh.",
+        99: "Baru sekarang password diverifikasi.",
+        102: "Kegagalan dicatat, bahkan untuk email yang tidak dikenal.",
+        55: "Advisory lock per email yang sama di TypeScript.",
+        56: "Hitung kegagalan dalam window.",
+        60: "Diblokir: batas dicek sebelum password.",
+        62: "Verifikasi password.",
+        63: "Catat kegagalan.",
       }}
     />
 
-    The handler turns the outcome into the generic responses, and burns the dummy verification for unknown emails.
+    Handler mengubah hasilnya menjadi response generik, dan menjalankan verifikasi dummy untuk email yang tidak dikenal.
 
     <CodeTabs
       go="labs/01-sessions/go/server.go#L179-L207"
       ts="labs/01-sessions/ts/src/app.ts#L112-L131"
       notes={{
-        191: "Unknown email: same argon2 cost as a real verification.",
-        202: "429 with Retry-After for a blocked login.",
-        205: "The same message for an unknown email and a wrong password.",
-        121: "Unknown email: dummy verification burns the same time.",
-        128: "429 with Retry-After.",
-        130: "Identical for an unknown email and a wrong password.",
+        191: "Email tidak dikenal: biaya argon2 sama dengan verifikasi asli.",
+        202: "429 dengan Retry-After untuk login yang diblokir.",
+        205: "Pesan yang sama untuk email tidak dikenal dan password salah.",
+        121: "Email tidak dikenal: verifikasi dummy menghabiskan waktu yang sama.",
+        128: "429 dengan Retry-After.",
+        130: "Identik untuk email tidak dikenal dan password salah.",
       }}
     />
 
-    And the dummy hash itself, computed once at startup so the timing is always right.
+    Dan dummy hash itu sendiri, dihitung sekali saat startup supaya timing-nya selalu pas.
 
     <CodeTabs
       go="labs/01-sessions/go/password.go#L60-L69"
@@ -124,46 +124,46 @@ import { flows } from "@/content/flows";
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Limit failed logins per account and per IP, and check the limit before verifying the password.",
-        "Use a time-boxed window rather than a permanent lock, so attackers cannot lock victims out.",
-        "Return one generic 401 for unknown email and wrong password.",
-        "Equalize timing with a dummy hash for unknown accounts.",
-        "Registration and password reset leak accounts too, so make them uniform.",
+        "Batasi login gagal per akun dan per IP, dan cek batasnya sebelum memverifikasi password.",
+        "Pakai window yang dibatasi waktu, bukan lock permanen, supaya attacker tidak bisa mengunci korban.",
+        "Kembalikan satu 401 generik untuk email tidak dikenal dan password salah.",
+        "Samakan timing dengan dummy hash untuk akun yang tidak dikenal.",
+        "Registrasi dan reset password juga membocorkan akun, jadi buat seragam.",
       ]}
       interview={[
         {
-          q: "How would you protect a login endpoint from brute force?",
-          a: "Rate-limit failures per account and per IP in a time window, returning 429 with Retry-After. Check the limit before verifying the password. Add breached-password checks, MFA, CAPTCHA or backoff after repeated failures, and alert on abnormal failure rates.",
+          q: "Gimana cara melindungi endpoint login dari brute force?",
+          a: "Rate-limit kegagalan per akun dan per IP dalam sebuah window waktu, balas 429 dengan Retry-After. Cek batasnya sebelum memverifikasi password. Tambahkan breached-password check, MFA, CAPTCHA atau backoff setelah kegagalan berulang, dan beri alert saat tingkat kegagalan tidak wajar.",
         },
         {
-          q: "What is account enumeration and how do you prevent it?",
-          a: "Learning which users exist, through different messages, status codes or timing. Return one generic error, do equal work for unknown accounts, and make registration and password reset responses uniform.",
+          q: "Apa itu account enumeration dan gimana mencegahnya?",
+          a: "Mencari tahu user mana yang ada, lewat pesan, status code, atau timing yang berbeda. Kembalikan satu error generik, lakukan kerja yang sama untuk akun yang tidak dikenal, dan buat response registrasi dan reset password seragam.",
         },
         {
-          q: "What is credential stuffing and why do per-account limits miss it?",
-          a: "Attackers replay email and password pairs leaked elsewhere, trying each pair once. Every account sees one or two attempts, so a per-account limit never trips. Per-IP limits, breached-password screening and MFA are the real defenses.",
+          q: "Apa itu credential stuffing dan kenapa batas per akun meleset?",
+          a: "Attacker memutar ulang pasangan email dan password yang bocor di tempat lain, mencoba tiap pasangan sekali. Setiap akun hanya melihat satu atau dua percobaan, jadi batas per akun tidak pernah terpicu. Batas per IP, screening breached-password, dan MFA adalah pertahanan yang sebenarnya.",
         },
         {
-          q: "Why not lock an account permanently after N failures?",
-          a: "It gives attackers a denial-of-service tool: anyone can lock out any user by guessing wrong. Use a short sliding window or exponential backoff instead.",
+          q: "Kenapa tidak mengunci akun permanen setelah N kegagalan?",
+          a: "Itu memberi attacker alat denial-of-service: siapa pun bisa mengunci user mana pun dengan menebak salah. Pakai sliding window yang pendek atau exponential backoff.",
         },
         {
-          q: "Why can a rate limiter fail under concurrent requests?",
-          a: "If it reads the failure count and writes the new failure separately, parallel requests all see the same low count and slip through. Serialize per account, for example with a database lock inside the transaction, or use an atomic counter.",
+          q: "Kenapa rate limiter bisa gagal saat ada request bersamaan?",
+          a: "Kalau ia membaca jumlah kegagalan dan menulis kegagalan baru secara terpisah, request paralel semuanya melihat jumlah rendah yang sama dan lolos. Serialkan per akun, misalnya dengan database lock di dalam transaksi, atau pakai atomic counter.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why returning 'user not found' from /login is a vulnerability, even though the user is just told the truth."
+      prompt="Jelaskan ke teman satu tim kenapa mengembalikan 'user not found' dari /login adalah kerentanan, padahal user cuma diberi tahu yang sebenarnya."
       rubric={[
-        "It reveals which emails have accounts",
-        "Attackers use that list for stuffing and phishing",
-        "A generic message and equal timing remove the signal",
-        "The same care applies to register and password reset",
+        "Ia membocorkan email mana yang punya akun",
+        "Attacker memakai daftar itu untuk stuffing dan phishing",
+        "Pesan generik dan timing yang sama menghilangkan sinyalnya",
+        "Kehati-hatian yang sama berlaku untuk register dan reset password",
       ]}
     />
   </Step>

@@ -1,28 +1,28 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    Lesson 1 left you with a problem. A self-contained token cannot be recalled, so it must expire fast. But nobody wants to type a password every five minutes.
+  <Step id="hook" title="Pembuka">
+    Lesson 1 meninggalkan satu masalah. Token self-contained nggak bisa ditarik kembali, jadi harus cepat expired. Tapi nggak ada yang mau ngetik password tiap lima menit.
 
-    The fix is to use **two** tokens with two different jobs: a short-lived one that opens doors, and a long-lived one whose only power is to get a new short-lived one.
+    Solusinya pakai **dua** token dengan dua tugas berbeda: yang berumur pendek untuk membuka pintu, dan yang berumur panjang yang satu-satunya kekuatannya cuma untuk meminta token pendek yang baru.
 
-    <Analogy title="The day pass and the membership card">
-      A gym gives you a day pass you show at every door, and it expires tonight. The membership card stays in your wallet, and you only show it at the front desk to get tomorrow's pass. Lose the day pass and you lose a day; lose the card and the desk can cancel it.
+    <Analogy title="Tiket harian dan kartu member">
+      Pusat kebugaran memberi kamu tiket harian yang ditunjukkan di setiap pintu, dan hangus malam ini. Kartu member tetap di dompet, dan cuma ditunjukkan ke resepsionis untuk dapat tiket besok. Tiket harian hilang, rugi sehari; kartu hilang, resepsionis bisa langsung membatalkannya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
+  <Step id="concept" title="Konsep">
     | | **Access token** | **Refresh token** |
     |---|---|---|
-    | Job | Authorize an API call | Get a new access token |
-    | Format in the lab | A signed JWT (RS256) | 32 random bytes, opaque |
-    | Lifetime in the lab | 5 minutes | 14 days |
-    | Sent to | Every API request | Only `/refresh` |
-    | Checked by | Signature and claims, no lookup | A database lookup |
-    | Can be revoked | Not before `exp` | Yes, at any time |
-    | Stored on the server | Nothing | Only its sha256 |
+    | Tugas | Mengotorisasi satu API call | Mendapatkan access token baru |
+    | Format di lab | JWT yang di-sign (RS256) | 32 byte acak, opaque |
+    | Masa berlaku di lab | 5 menit | 14 hari |
+    | Dikirim ke | Setiap API request | Hanya `/refresh` |
+    | Dicek lewat | Signature dan claims, tanpa lookup | Lookup database |
+    | Bisa di-revoke | Tidak sebelum `exp` | Ya, kapan saja |
+    | Disimpan di server | Tidak ada | Hanya sha256-nya |
 
-    The login response in the lab shows both, in the two places they belong:
+    Response login di lab menampilkan keduanya, di dua tempat yang semestinya:
 
     ```text
     HTTP/1.1 200 OK
@@ -33,72 +33,72 @@ import { flows } from "@/content/flows";
     {"access_token":"eyJhbGci…","token_type":"Bearer","expires_in":300}
     ```
 
-    The **access token** goes in the body, so the page's code can hold it and send `Authorization: Bearer <token>`. That header is defined by RFC 6750. The **refresh token** goes in a cookie the page's JavaScript cannot read, and each attribute earns its place:
+    **Access token** ada di body, jadi kode di halaman bisa memegangnya dan mengirim `Authorization: Bearer <token>`. Header itu didefinisikan di RFC 6750. **Refresh token** ada di cookie yang nggak bisa dibaca JavaScript halaman, dan tiap atributnya ada alasannya:
 
-    | Attribute | Why |
+    | Atribut | Kenapa |
     |---|---|
-    | `HttpOnly` | An XSS bug cannot read and copy the refresh token (lesson 4) |
-    | `Path=/refresh` | The browser sends it only to `/refresh` and `/refresh/logout`, never with ordinary API calls |
-    | `SameSite=Strict` | Never sent on a cross-site request |
-    | `Max-Age=1209600` | 14 days, then the user logs in again |
-    | `Secure` | Missing only because the lab runs on `http://localhost`. In production it is required |
+    | `HttpOnly` | Bug XSS nggak bisa membaca dan menyalin refresh token (lesson 4) |
+    | `Path=/refresh` | Browser hanya mengirimnya ke `/refresh` dan `/refresh/logout`, nggak pernah ikut API call biasa |
+    | `SameSite=Strict` | Nggak pernah dikirim pada request lintas situs |
+    | `Max-Age=1209600` | 14 hari, setelah itu user login lagi |
+    | `Secure` | Absen hanya karena lab jalan di `http://localhost`. Di production ini wajib |
 
-    `Cache-Control: no-store` matters too: a response carrying a token must never sit in a browser or proxy cache.
+    `Cache-Control: no-store` juga penting: response yang membawa token nggak boleh mengendap di cache browser atau proxy.
 
     <Callout type="info">
-      Why is the refresh token **not** a JWT? Its whole point is to be revocable and to live in a server-side table, so a random opaque value that the server looks up is the right shape. Storing only the sha256 follows the Module 1 rule: a leaked database must not contain usable credentials.
+      Kenapa refresh token **bukan** JWT? Tujuan utamanya adalah bisa di-revoke dan tinggal di tabel sisi server, jadi nilai acak opaque yang di-lookup server adalah bentuk yang pas. Menyimpan hanya sha256-nya mengikuti aturan Module 1: database yang bocor nggak boleh berisi credential yang bisa dipakai.
     </Callout>
   </Step>
 
   <Step id="rotation" title="Rotation">
-    A refresh token that lives 14 days is a juicy target. **Refresh token rotation** shrinks the damage: every time you use a refresh token, the server retires it and hands out a new one.
+    Refresh token yang hidup 14 hari itu target yang menggiurkan. **Refresh token rotation** memperkecil kerusakannya: setiap kali kamu memakai refresh token, server memensiunkannya dan memberi yang baru.
 
     <SequenceFlow flow={flows.refreshRotation} />
 
-    The server keeps tokens in a **family**, one family per login. Each use does this in one database transaction:
+    Server menyimpan token dalam satu **family**, satu family per login. Setiap pemakaian melakukan ini dalam satu transaksi database:
 
-    1. Look up the presented token's row, and lock it.
-    2. If it is **already used or revoked**: revoke the whole family and answer 401.
-    3. Otherwise mark it used, insert its successor in the same family, and return a new access token and a new cookie.
+    1. Cari baris token yang disodorkan, lalu lock.
+    2. Kalau sudah **dipakai atau di-revoke**: revoke seluruh family dan balas 401.
+    3. Kalau belum, tandai sudah dipakai, masukkan penggantinya di family yang sama, lalu kembalikan access token baru dan cookie baru.
 
-    Step 2 is **reuse detection**. If a thief and the real user both hold token 1, whoever refreshes second presents a spent token. The server cannot tell which of them is the thief, so it revokes the family. Both must log in again, and the thief is out. The OAuth 2.0 Security Best Current Practice (RFC 9700) recommends this for refresh tokens.
+    Langkah 2 adalah **reuse detection**. Kalau pencuri dan user asli sama-sama memegang token 1, siapa pun yang refresh belakangan menyodorkan token yang sudah terpakai. Server nggak bisa tahu mana yang pencuri, jadi dia me-revoke family. Keduanya harus login ulang, dan si pencuri tersingkir. OAuth 2.0 Security Best Current Practice (RFC 9700) merekomendasikan ini untuk refresh token.
 
     <Callout type="warn">
-      Rotation has a real cost. Two tabs refreshing at the same moment, or a retry after a lost response, can present the same token twice, and look exactly like theft. Production systems either serialize refreshes on the client or allow a very short grace window for the previous token. The lab locks the row (`FOR UPDATE`) so only one of two concurrent refreshes can win, and the loser is treated as reuse.
+      Rotation punya biaya nyata. Dua tab yang refresh bersamaan, atau retry setelah response hilang, bisa menyodorkan token yang sama dua kali dan terlihat persis seperti pencurian. Sistem production biasanya menserialisasi refresh di sisi client atau memberi grace window yang sangat pendek untuk token sebelumnya. Lab ini me-lock baris (`FOR UPDATE`) sehingga hanya satu dari dua refresh bersamaan yang menang, dan yang kalah dianggap reuse.
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Run the whole cycle once: log in, call the API, refresh. The seeded user is `alice@example.com`.
+    Jalankan satu siklus penuh: login, panggil API, refresh. User bawaannya `alice@example.com`.
 
     <LabTasks />
 
     <LabConsole
       lab="02"
       actions={[
-        { label: "Log in", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
+        { label: "Login", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
         { label: "Profile", method: "GET", path: "/api/profile", headers: { Authorization: "Bearer {{accessToken}}" } },
-        { label: "Profile, no token", method: "GET", path: "/api/profile" },
+        { label: "Profile, tanpa token", method: "GET", path: "/api/profile" },
         { label: "Refresh", method: "POST", path: "/refresh" },
       ]}
     />
 
-    1. Click **Log in**. The body has the access token. Open the `POST /login` row in the Inspector and look at the **Cookies** tab: `rt` with `HttpOnly`, `Path=/refresh` and `SameSite=Strict`.
-    2. Click **Profile**. The console sent `Authorization: Bearer <your token>` for you and the API answered `200`.
-    3. Click **Profile, no token**. The answer is `401` with `WWW-Authenticate: Bearer`: no credentials at all, as RFC 6750 asks. A token that is present but bad gets `error="invalid_token"` instead.
-    4. Click **Refresh**. The browser attaches the cookie without any help from the page. You get a new access token and a **new** `rt` in `Set-Cookie`. The old one is now spent.
+    1. Klik **Login**. Body-nya berisi access token. Buka baris `POST /login` di Inspector dan lihat tab **Cookies**: `rt` dengan `HttpOnly`, `Path=/refresh`, dan `SameSite=Strict`.
+    2. Klik **Profile**. Console mengirim `Authorization: Bearer <token kamu>` secara otomatis dan API membalas `200`.
+    3. Klik **Profile, tanpa token**. Jawabannya `401` dengan `WWW-Authenticate: Bearer`: sama sekali nggak ada credential, sesuai permintaan RFC 6750. Token yang ada tapi salah akan mendapat `error="invalid_token"`.
+    4. Klik **Refresh**. Browser menyertakan cookie tanpa bantuan halaman. Kamu dapat access token baru dan `rt` **baru** di `Set-Cookie`. Yang lama sekarang sudah terpakai.
 
-    You never typed or copied the refresh token, and neither could a script on the page: it is HttpOnly.
+    Kamu nggak pernah mengetik atau menyalin refresh token, dan script di halaman pun nggak bisa: dia HttpOnly.
   </Step>
 
   <Step id="reuse" title="Reuse detection">
-    A browser will not let you replay an old cookie, so for this part act as the thief with `curl`. Use the port of the implementation you selected: `4102` for Go, `4202` for TypeScript. Run this in Git Bash, WSL or any POSIX shell.
+    Browser nggak akan membiarkan kamu memutar ulang cookie lama, jadi di bagian ini berperanlah jadi pencuri pakai `curl`. Pakai port dari implementasi yang kamu pilih: `4102` untuk Go, `4202` untuk TypeScript. Jalankan di Git Bash, WSL, atau shell POSIX apa saja.
 
     ```bash
     LAB=http://localhost:4102
@@ -114,97 +114,97 @@ import { flows } from "@/content/flows";
     curl -s -o /dev/null -w '%{http_code}\n' -X POST $LAB/refresh -H "Cookie: rt=$RT"
     ```
 
-    The second call prints `401`. Look at the Inspector: the first `POST /refresh` returned 200, the second returned 401, and the lab task above ticked.
+    Panggilan kedua mencetak `401`. Lihat Inspector: `POST /refresh` pertama mengembalikan 200, yang kedua 401, dan lab task di atas tercentang.
 
-    The first call also issued a successor token. The second call revoked the whole family, so that successor is dead too and the real user is logged out as well. That is the intended outcome: a copied token costs both parties their session, and the user finds out the next time they refresh.
+    Panggilan pertama juga menerbitkan token pengganti. Panggilan kedua me-revoke seluruh family, jadi token pengganti itu ikut mati dan user asli ikut ter-logout. Memang itu hasil yang diinginkan: token yang disalin membuat kedua pihak kehilangan session, dan user baru sadar saat refresh berikutnya.
   </Step>
 
-  <Step id="code" title="Code">
-    The cookie. Every attribute from the table is one line here.
+  <Step id="code" title="Kode">
+    Cookie-nya. Setiap atribut dari tabel tadi jadi satu baris di sini.
 
     <CodeTabs
       go="labs/02-jwt/go/refresh.go#L36-L45"
       ts="labs/02-jwt/ts/src/refresh.ts#L16-L20"
       notes={{
-        40: "HttpOnly, SameSite=Strict, Path=/refresh and a 14-day Max-Age. No Secure only because the lab is plain http://localhost.",
-        44: "Clearing the cookie is the same cookie with MaxAge -1.",
-        19: "The same attributes as a raw Set-Cookie string.",
-        20: "Clearing it: Max-Age=0.",
+        40: "HttpOnly, SameSite=Strict, Path=/refresh, dan Max-Age 14 hari. Nggak ada Secure hanya karena lab ini pakai http://localhost biasa.",
+        44: "Menghapus cookie itu cookie yang sama dengan MaxAge -1.",
+        19: "Atribut yang sama dalam bentuk string Set-Cookie mentah.",
+        20: "Menghapusnya: Max-Age=0.",
       }}
     />
 
-    Rotation itself. The row is locked, a reused token revokes its family, and the new token is inserted in the same transaction as the old one is retired.
+    Rotation-nya sendiri. Barisnya di-lock, token yang dipakai ulang me-revoke family-nya, dan token baru di-insert dalam transaksi yang sama dengan pensiunnya token lama.
 
     <CodeTabs
       go="labs/02-jwt/go/refresh.go#L56-L97"
       ts="labs/02-jwt/ts/src/refresh.ts#L30-L55"
       notes={{
-        71: "FOR UPDATE: two concurrent refreshes of one token cannot both succeed.",
-        78: "Reuse detection. A used or revoked token means it was copied.",
-        79: "Revoke every token of the family.",
-        87: "Otherwise: a fresh random successor.",
-        88: "The presented token is retired (used_at).",
-        92: "The successor joins the same family.",
-        42: "The same lock in TypeScript.",
+        71: "FOR UPDATE: dua refresh bersamaan atas satu token nggak bisa sama-sama berhasil.",
+        78: "Reuse detection. Token yang sudah dipakai atau di-revoke berarti sudah disalin.",
+        79: "Revoke semua token di family.",
+        87: "Kalau belum: pengganti acak yang baru.",
+        88: "Token yang disodorkan dipensiunkan (used_at).",
+        92: "Pengganti bergabung ke family yang sama.",
+        42: "Lock yang sama di TypeScript.",
         44: "Reuse detection.",
-        45: "Revoke the family. Returning here commits it, so the revocation sticks.",
-        49: "A fresh successor, retired predecessor and a new row, all in one transaction.",
+        45: "Revoke family. Return di sini meng-commit-nya, jadi revoke-nya permanen.",
+        49: "Pengganti baru, pendahulu yang dipensiunkan, dan baris baru, semuanya dalam satu transaksi.",
       }}
     />
 
-    And the handler that ties it to the token response: rotate first, then issue the access token and set the new cookie.
+    Dan handler yang menghubungkannya ke response token: rotate dulu, baru terbitkan access token dan set cookie baru.
 
     <CodeTabs
       go="labs/02-jwt/go/server.go#L203-L225"
       ts="labs/02-jwt/ts/src/app.ts#L139-L146"
       notes={{
-        204: "The refresh token is read from the cookie, never from the request body.",
-        209: "Rotate: retire the old token and get its successor.",
-        218: "A fresh access token for the same user.",
-        223: "The new refresh token goes out in the cookie.",
-        140: "Cookie in, rotation next.",
-        143: "Same sequence: issue the access token...",
-        144: "...and set the successor cookie.",
+        204: "Refresh token dibaca dari cookie, tidak pernah dari body request.",
+        209: "Rotate: pensiunkan token lama dan ambil penggantinya.",
+        218: "Access token baru untuk user yang sama.",
+        223: "Refresh token baru keluar lewat cookie.",
+        140: "Cookie masuk, rotation berikutnya.",
+        143: "Urutan yang sama: terbitkan access token...",
+        144: "...dan set cookie pengganti.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Two tokens, two jobs: a short-lived JWT access token and a long-lived opaque refresh token.",
-        "The refresh token lives in an HttpOnly, SameSite=Strict cookie scoped to /refresh. The access token is held by the page and sent as a Bearer header.",
-        "The server stores only the sha256 of the refresh token, so it can look it up and revoke it.",
-        "Rotation: each refresh retires the token and issues a successor in the same family.",
-        "Reuse detection: a spent token coming back revokes the whole family and forces a new login.",
+        "Dua token, dua tugas: JWT access token berumur pendek dan refresh token opaque berumur panjang.",
+        "Refresh token ada di cookie HttpOnly, SameSite=Strict dengan scope /refresh. Access token dipegang halaman dan dikirim sebagai header Bearer.",
+        "Server hanya menyimpan sha256 dari refresh token, jadi bisa me-lookup dan me-revoke-nya.",
+        "Rotation: setiap refresh memensiunkan token dan menerbitkan pengganti di family yang sama.",
+        "Reuse detection: token terpakai yang muncul lagi me-revoke seluruh family dan memaksa login baru.",
       ]}
       interview={[
         {
-          q: "Why use both an access token and a refresh token?",
-          a: "A self-contained access token cannot be revoked, so it needs a short life to limit a theft. The refresh token lets the user stay signed in without re-entering a password: it is long-lived but used rarely, only against one endpoint, and the server can revoke it because it is checked against a database.",
+          q: "Kenapa memakai access token sekaligus refresh token?",
+          a: "Access token yang self-contained nggak bisa di-revoke, jadi butuh umur pendek untuk membatasi dampak pencurian. Refresh token membuat user tetap login tanpa mengetik password lagi: umurnya panjang tapi jarang dipakai, hanya ke satu endpoint, dan server bisa me-revoke-nya karena dicek ke database.",
         },
         {
-          q: "What is refresh token rotation and what does it protect against?",
-          a: "Every use of a refresh token returns a new one and retires the old one. If an old token is ever presented again, the server knows it was copied, revokes the whole token family and forces a fresh login. It turns a silent, long-lived theft into a detected one.",
+          q: "Refresh token rotation itu apa dan melindungi dari apa?",
+          a: "Setiap pemakaian refresh token mengembalikan yang baru dan memensiunkan yang lama. Kalau token lama pernah disodorkan lagi, server tahu token itu sudah disalin, me-revoke seluruh token family, dan memaksa login baru. Pencurian yang diam-diam dan berumur panjang berubah jadi pencurian yang terdeteksi.",
         },
         {
-          q: "Where do you store the refresh token in a browser app?",
-          a: "In an HttpOnly cookie with SameSite=Strict (or Lax), Secure, and a Path limited to the refresh endpoint, so JavaScript cannot read it and it is not sent with ordinary requests. The access token is kept in memory.",
+          q: "Di mana refresh token disimpan di aplikasi browser?",
+          a: "Di cookie HttpOnly dengan SameSite=Strict (atau Lax), Secure, dan Path yang dibatasi ke endpoint refresh, sehingga JavaScript nggak bisa membacanya dan nggak ikut terkirim di request biasa. Access token disimpan di memory.",
         },
         {
-          q: "What are the downsides of rotation?",
-          a: "Concurrency. Two tabs, or a retried request, can send the same token twice, which looks like theft and logs the user out. Mitigate it by serializing refreshes in the client, or by allowing a short grace window for the previous token on the server.",
+          q: "Apa kekurangan rotation?",
+          a: "Concurrency. Dua tab, atau request yang di-retry, bisa mengirim token yang sama dua kali, yang terlihat seperti pencurian dan membuat user ter-logout. Mitigasinya: serialisasi refresh di client, atau beri grace window singkat untuk token sebelumnya di server.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate what happens, step by step, when a stolen refresh token is used after the real user has already refreshed."
+      prompt="Jelaskan ke teman satu tim, langkah demi langkah, apa yang terjadi ketika refresh token curian dipakai setelah user asli sudah refresh."
       rubric={[
-        "The real user's refresh retired the old token and issued a new one",
-        "The thief presents the old, already used token",
-        "The server sees it is spent, revokes the whole family and returns 401",
-        "Both the thief and the user must log in again, which exposes the theft",
+        "Refresh dari user asli memensiunkan token lama dan menerbitkan yang baru",
+        "Pencuri menyodorkan token lama yang sudah terpakai",
+        "Server melihat token itu sudah terpakai, me-revoke seluruh family, dan membalas 401",
+        "Pencuri maupun user harus login ulang, sehingga pencurian itu ketahuan",
       ]}
     />
   </Step>

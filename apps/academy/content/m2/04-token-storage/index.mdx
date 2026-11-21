@@ -1,42 +1,42 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    You have two tokens now, and the browser gives you exactly four places to put them: `localStorage`, `sessionStorage`, a variable in memory, or a cookie. Every tutorial picks one, and most do not say what it costs.
+  <Step id="hook" title="Pembuka">
+    Sekarang kamu punya dua token, dan browser cuma menyediakan empat tempat untuk menaruhnya: `localStorage`, `sessionStorage`, variabel di memory, atau cookie. Setiap tutorial memilih salah satu, dan kebanyakan nggak bilang apa harganya.
 
-    The honest answer depends on one question: what can the attacker do when a script they wrote runs inside your page? That attack is **XSS (cross-site scripting)**, and it is the reason this lesson exists.
+    Jawaban jujurnya bergantung pada satu pertanyaan: apa yang bisa dilakukan attacker kalau script buatannya jalan di dalam halaman kamu? Serangan itu namanya **XSS (cross-site scripting)**, dan itulah alasan lesson ini ada.
 
-    <Analogy title="The wallet and the taped note">
-      A wallet in your pocket needs someone to reach into your pocket. A note with your PIN taped to the front door can be read by everyone who walks by. Where you keep a secret decides who can get at it.
+    <Analogy title="Dompet dan sticky note PIN">
+      Dompet di saku celana butuh orang yang merogoh sakumu. Sticky note berisi PIN yang ditempel di pintu depan bisa dibaca semua orang yang lewat. Di mana kamu menyimpan rahasia menentukan siapa yang bisa mengambilnya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Any JavaScript that runs on your page runs with **all** of your page's privileges. It can read `localStorage`, call your API, and send data to any server. It does not matter how the script got there: a comment field that did not escape HTML, a compromised npm dependency, a third-party ad.
+  <Step id="concept" title="Konsep">
+    JavaScript apa pun yang jalan di halaman kamu berjalan dengan **semua** hak akses halaman itu. Dia bisa membaca `localStorage`, memanggil API kamu, dan mengirim data ke server mana pun. Nggak penting bagaimana script itu sampai di sana: kolom komentar yang nggak meng-escape HTML, dependency npm yang kena kompromi, atau iklan pihak ketiga.
 
     <SequenceFlow flow={flows.xssTheft} />
 
-    Two things follow, and they pull in opposite directions.
+    Dari sini muncul dua hal, dan arahnya berlawanan.
 
-    1. A token that JavaScript **can read** can be stolen and replayed from the attacker's own machine, at leisure, until it expires.
-    2. A token the browser attaches **by itself** (a cookie) is exposed to forged requests from other sites. That is CSRF, from Module 1.
+    1. Token yang **bisa dibaca** JavaScript bisa dicuri dan dipakai ulang dari mesin attacker sendiri, dengan santai, sampai expired.
+    2. Token yang disertakan browser **secara otomatis** (cookie) terbuka terhadap request palsu dari situs lain. Itu CSRF, dari Module 1.
 
-    So there is no storage that is safe against everything. The goal is to choose which risk you take for each token, and to keep the stolen-token window small.
+    Jadi nggak ada storage yang aman dari segalanya. Tujuannya adalah memilih risiko mana yang kamu ambil untuk tiap token, dan menjaga jendela token curian tetap kecil.
   </Step>
 
-  <Step id="options" title="The options">
-    | Where | Readable by an XSS script? | Sent automatically (CSRF)? | Survives a reload? | Verdict |
+  <Step id="options" title="Pilihan yang ada">
+    | Tempat | Bisa dibaca script XSS? | Dikirim otomatis (CSRF)? | Bertahan setelah reload? | Kesimpulan |
     |---|---|---|---|---|
-    | `localStorage` | **Yes** | No | Yes, in every tab | Avoid for tokens |
-    | `sessionStorage` | **Yes** | No | Only in that tab | Avoid for tokens |
-    | In-memory variable | Not directly | No | No: gone on reload | Good for the **access** token |
-    | `HttpOnly` cookie | **No** | **Yes** | Yes | Good for the **refresh** token, with `SameSite` and a narrow `Path` |
+    | `localStorage` | **Ya** | Tidak | Ya, di semua tab | Hindari untuk token |
+    | `sessionStorage` | **Ya** | Tidak | Hanya di tab itu | Hindari untuk token |
+    | Variabel di memory | Tidak langsung | Tidak | Tidak: hilang saat reload | Bagus untuk **access** token |
+    | Cookie `HttpOnly` | **Tidak** | **Ya** | Ya | Bagus untuk **refresh** token, dengan `SameSite` dan `Path` yang sempit |
 
-    That gives the pattern Lab 02 uses:
+    Dari situ lahir pola yang dipakai Lab 02:
 
-    - The **access token** lives only in a JavaScript variable inside your app's own code. It is never written to storage, so there is nothing for a script to read from storage, and it is short-lived anyway.
-    - The **refresh token** lives in an `HttpOnly; SameSite=Strict` cookie scoped to `Path=/refresh`. JavaScript cannot read it. The browser sends it only to the refresh endpoint.
-    - On page load there is no access token in memory yet. The app calls `POST /refresh`, the cookie rides along, and a new access token comes back. A reload costs one request, not a login.
+    - **Access token** hidup hanya di variabel JavaScript di dalam kode aplikasi kamu sendiri. Dia nggak pernah ditulis ke storage, jadi nggak ada yang bisa dibaca script dari storage, dan umurnya memang pendek.
+    - **Refresh token** hidup di cookie `HttpOnly; SameSite=Strict` dengan scope `Path=/refresh`. JavaScript nggak bisa membacanya. Browser hanya mengirimnya ke endpoint refresh.
+    - Saat halaman dimuat, belum ada access token di memory. Aplikasi memanggil `POST /refresh`, cookie ikut terkirim, dan access token baru kembali. Reload cuma butuh satu request, bukan login ulang.
 
     ```js
     let accessToken = null; // module scope: not on window, not in storage
@@ -56,99 +56,99 @@ import { flows } from "@/content/flows";
     ```
 
     <Callout type="warn">
-      **XSS can still use the session while the page is open.** The injected script can call your API, and it can call `POST /refresh`: the browser attaches the HttpOnly cookie for it and the script receives a fresh access token. It could even send that access token to the attacker, but it only works until it expires (5 minutes here). What it cannot do is carry the refresh token away, so the damage ends when the tab closes or you revoke the session, instead of lasting 14 days.
+      **XSS tetap bisa memakai session selama halaman terbuka.** Script suntikan bisa memanggil API kamu, dan bisa memanggil `POST /refresh`: browser menyertakan cookie HttpOnly untuknya dan script menerima access token baru. Dia bahkan bisa mengirim access token itu ke attacker, tapi hanya berlaku sampai expired (5 menit di sini). Yang nggak bisa dilakukan adalah membawa kabur refresh token, jadi kerusakannya berakhir saat tab ditutup atau session di-revoke, bukan bertahan 14 hari.
     </Callout>
 
-    A cookie-carried refresh token raises the CSRF question again. The lab answers it with `SameSite=Strict` and `Path=/refresh`, and a production setup should also check the `Origin` header on `/refresh`. A forged request cannot read the response, so the worst it could do is trigger a rotation.
+    Refresh token yang dibawa cookie memunculkan lagi pertanyaan CSRF. Lab menjawabnya dengan `SameSite=Strict` dan `Path=/refresh`, dan setup production sebaiknya juga mengecek header `Origin` di `/refresh`. Request palsu nggak bisa membaca response, jadi paling parah dia cuma memicu satu rotation.
 
     <Callout type="info">
-      The strongest option is not to put tokens in the browser at all. In a **backend-for-frontend (BFF)** design the browser only has an ordinary HttpOnly session cookie, and a server of yours holds the tokens and calls the APIs. It is more moving parts, but nothing stealable is left in the page. Module 3 returns to this for OAuth.
+      Opsi paling kuat adalah nggak menaruh token di browser sama sekali. Di desain **backend-for-frontend (BFF)**, browser hanya punya cookie session HttpOnly biasa, dan server milik kamu yang memegang token serta memanggil API. Bagian yang bergerak lebih banyak, tapi nggak ada yang bisa dicuri di halaman. Module 3 membahas ini lagi untuk OAuth.
     </Callout>
 
     <Callout type="info">
-      Worth asking of your own setup: where does the **sso-frontend** keep the token it gets from **sso-backend**? Storage, memory or a cookie, and which row of the table above is that?
+      Coba tanyakan ke setup kamu sendiri: di mana **sso-frontend** menyimpan token yang dia dapat dari **sso-backend**? Storage, memory, atau cookie, dan itu baris mana di tabel di atas?
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="simulate" title="Simulator">
-    Play the attacker. An injected script tries all five places at once. Run it, see which ones leak, and then ask what the script can still do.
+    Jadilah attacker. Script suntikan mencoba kelima tempat sekaligus. Jalankan, lihat mana yang bocor, lalu tanyakan apa yang masih bisa dilakukan script itu.
 
-    1. Click **Run XSS script** and read the **Result** column.
-    2. Click **Call the API from the page** and read the warning that appears.
+    1. Klik **Jalankan script XSS** dan baca kolom **Result**.
+    2. Klik **Panggil API dari halaman** dan baca peringatan yang muncul.
 
     <StorageSim />
 
-    This is a simulation, so nothing leaves the page. It is also why every token-handling lesson in Module 2 keeps repeating that **XSS is the root problem**: the best storage choice shrinks the damage, and the only cure is not to have the bug (output encoding, a strict Content Security Policy, careful dependencies).
+    Ini simulasi, jadi nggak ada yang keluar dari halaman. Ini juga alasan setiap lesson soal penanganan token di Module 2 terus mengulang bahwa **XSS adalah akar masalahnya**: pilihan storage terbaik memperkecil kerusakan, dan satu-satunya obat adalah tidak punya bug-nya (output encoding, Content Security Policy yang ketat, dependency yang hati-hati).
   </Step>
 
-  <Step id="code" title="Code">
-    The login handler is the pattern in a few lines. The access token goes out in the JSON body for the page to hold, the refresh token goes out in the cookie, and nothing is written anywhere the page's storage could see.
+  <Step id="code" title="Kode">
+    Handler login adalah pola tadi dalam beberapa baris. Access token keluar lewat body JSON untuk dipegang halaman, refresh token keluar lewat cookie, dan nggak ada yang ditulis ke tempat yang bisa dilihat storage halaman.
 
     <CodeTabs
       go="labs/02-jwt/go/server.go#L160-L166"
       ts="labs/02-jwt/ts/src/app.ts#L112-L114"
       notes={{
-        165: "The refresh token: an HttpOnly, SameSite=Strict cookie scoped to /refresh.",
-        166: "The access token: the JSON body, with token_type Bearer and expires_in 300.",
-        113: "The refresh cookie, appended to the response.",
-        114: "The access token in the body.",
+        165: "Refresh token: cookie HttpOnly, SameSite=Strict dengan scope /refresh.",
+        166: "Access token: body JSON, dengan token_type Bearer dan expires_in 300.",
+        113: "Cookie refresh, ditambahkan ke response.",
+        114: "Access token di body.",
       }}
     />
 
-    And the header that keeps both out of caches. Any response that carries a token or identity says `no-store`.
+    Dan header yang menjaga keduanya dari cache. Setiap response yang membawa token atau identitas berisi `no-store`.
 
     <CodeTabs
       go="labs/02-jwt/go/server.go#L63-L69"
       ts="labs/02-jwt/ts/src/app.ts#L85-L91"
       notes={{
-        66: "Cache-Control: no-store on every token-bearing route.",
-        88: "The same header, applied to /login, /api/profile and /refresh.",
+        66: "Cache-Control: no-store di setiap route yang membawa token.",
+        88: "Header yang sama, diterapkan ke /login, /api/profile, dan /refresh.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Any script running on your page has your page's full privileges. That is XSS, and it decides the storage question.",
-        "localStorage and sessionStorage are readable by every script on the origin. Do not keep tokens there.",
-        "Recommended: the access token in memory, the refresh token in an HttpOnly, Secure, SameSite cookie scoped to the refresh path.",
-        "A cookie is sent automatically, so it needs CSRF protection. An Authorization header is not, so it does not.",
-        "XSS can still use the session while the page is open. The pattern limits how long, not whether.",
+        "Script apa pun yang jalan di halaman kamu punya hak akses penuh halaman itu. Itulah XSS, dan dia yang menentukan jawaban soal storage.",
+        "localStorage dan sessionStorage bisa dibaca setiap script di origin. Jangan simpan token di sana.",
+        "Direkomendasikan: access token di memory, refresh token di cookie HttpOnly, Secure, SameSite dengan scope ke path refresh.",
+        "Cookie dikirim otomatis, jadi butuh proteksi CSRF. Header Authorization tidak, jadi tidak butuh.",
+        "XSS tetap bisa memakai session selama halaman terbuka. Pola ini membatasi berapa lama, bukan apakah bisa.",
       ]}
       interview={[
         {
-          q: "Where should a single-page app store its JWTs?",
-          a: "The access token in memory only, and the refresh token in an HttpOnly, Secure, SameSite cookie limited to the refresh endpoint. On a reload the app calls refresh to get a new access token. Avoid localStorage, because any injected script can read it. For the highest assurance use a backend-for-frontend so tokens never reach the browser.",
+          q: "Di mana single-page app sebaiknya menyimpan JWT-nya?",
+          a: "Access token hanya di memory, dan refresh token di cookie HttpOnly, Secure, SameSite yang dibatasi ke endpoint refresh. Saat reload, aplikasi memanggil refresh untuk mendapat access token baru. Hindari localStorage, karena script suntikan apa pun bisa membacanya. Untuk jaminan tertinggi, pakai backend-for-frontend supaya token nggak pernah sampai ke browser.",
         },
         {
-          q: "HttpOnly cookie versus localStorage: what is the trade-off?",
-          a: "localStorage is readable by any script on the origin, so XSS can steal the token, but requests need an explicit Authorization header and so are not exposed to CSRF. An HttpOnly cookie cannot be read by scripts, but the browser attaches it automatically, so you need SameSite and CSRF defenses. Neither stops XSS from acting as the user while the page is open.",
+          q: "Cookie HttpOnly versus localStorage: apa trade-off-nya?",
+          a: "localStorage bisa dibaca script apa pun di origin, jadi XSS bisa mencuri token, tapi request butuh header Authorization eksplisit sehingga nggak terbuka terhadap CSRF. Cookie HttpOnly nggak bisa dibaca script, tapi browser menyertakannya otomatis, jadi kamu butuh SameSite dan pertahanan CSRF. Tidak satu pun menghentikan XSS bertindak sebagai user selama halaman terbuka.",
         },
         {
-          q: "If the access token is only in memory, is XSS still a problem?",
-          a: "Yes. The injected script can call your API and your refresh endpoint from inside the page, and the browser attaches the cookie. It could send a freshly minted access token to the attacker, but that works only until it expires. It cannot exfiltrate the refresh token, so the attack ends when the page closes or the session is revoked. You still must prevent XSS: output encoding, a strict Content Security Policy and trusted dependencies.",
+          q: "Kalau access token hanya di memory, apakah XSS masih jadi masalah?",
+          a: "Ya. Script suntikan bisa memanggil API dan endpoint refresh dari dalam halaman, dan browser menyertakan cookie-nya. Dia bisa mengirim access token yang baru dibuat ke attacker, tapi itu hanya berlaku sampai expired. Dia nggak bisa meng-exfiltrate refresh token, jadi serangan berakhir saat halaman ditutup atau session di-revoke. Kamu tetap harus mencegah XSS: output encoding, Content Security Policy yang ketat, dan dependency yang terpercaya.",
         },
         {
-          q: "Why scope the refresh cookie to Path=/refresh?",
-          a: "So the browser sends it only to the refresh and logout endpoints, not with every API call. That keeps it out of logs and handlers that never need it, and shrinks the places where it can leak.",
+          q: "Kenapa cookie refresh dibatasi ke Path=/refresh?",
+          a: "Supaya browser hanya mengirimnya ke endpoint refresh dan logout, bukan di setiap API call. Itu menjaganya dari log dan handler yang nggak butuh dia, dan memperkecil tempat dia bisa bocor.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why the lab keeps the access token in memory and the refresh token in an HttpOnly cookie, and what an XSS attacker can still do."
+      prompt="Jelaskan ke teman satu tim kenapa lab menyimpan access token di memory dan refresh token di cookie HttpOnly, dan apa yang masih bisa dilakukan attacker XSS."
       rubric={[
-        "Memory and HttpOnly cookies cannot be read and copied by an injected script, while localStorage can",
-        "The access token is short-lived and never stored; the refresh token is hidden from JavaScript and path-scoped",
-        "The cookie is sent automatically, so SameSite and CSRF defenses are needed",
-        "XSS can still make requests as the user while the page is open, so the real fix is to prevent XSS",
+        "Memory dan cookie HttpOnly nggak bisa dibaca dan disalin script suntikan, sedangkan localStorage bisa",
+        "Access token berumur pendek dan nggak disimpan; refresh token disembunyikan dari JavaScript dan dibatasi path-nya",
+        "Cookie dikirim otomatis, jadi butuh SameSite dan pertahanan CSRF",
+        "XSS tetap bisa membuat request sebagai user selama halaman terbuka, jadi solusi sebenarnya adalah mencegah XSS",
       ]}
     />
   </Step>

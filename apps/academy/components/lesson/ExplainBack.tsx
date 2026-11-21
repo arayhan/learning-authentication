@@ -41,9 +41,9 @@ export function ExplainBack({ prompt, rubric }: { prompt: string; rubric: string
 
   return (
     <fieldset className="max-w-[68ch] space-y-3 rounded-lg border p-4">
-      <legend className="px-1 text-xs font-medium uppercase tracking-wide text-brand">Explain it back</legend>
+      <legend className="px-1 text-xs font-medium uppercase tracking-wide text-brand">Jelasin balik</legend>
       <p className="text-sm font-medium">{prompt}</p>
-      <p className="text-sm text-muted-foreground">Say your answer out loud, then check what it covered.</p>
+      <p className="text-sm text-muted-foreground">Jawab dengan suara keras dulu, lalu centang poin yang sudah kamu sebut.</p>
       <ul className="space-y-2">
         {rubric.map((item, i) => (
           <li key={item} className="flex items-start gap-2 text-sm">

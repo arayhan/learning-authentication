@@ -46,10 +46,10 @@ export function LessonSteps({ children }: { children: React.ReactNode }) {
       )}
       {active < 0 && steps.length > 0 && (
         <p className="border-t pt-6 text-sm text-muted-foreground">
-          Lesson complete.{" "}
+          Lesson selesai.{" "}
           {next && (
             <Link href={lessonUrl(next)} className="font-medium text-brand underline-offset-4 hover:underline">
-              Next: {next.title}
+              Lanjut: {next.title}
             </Link>
           )}
         </p>

@@ -33,7 +33,7 @@ const write = (collapsed: boolean) => {
 /** Collapsible right pane. Open on the server render, then follows localStorage once hydrated. */
 export function RightPane({ title, children }: { title: string; children: React.ReactNode }) {
   const collapsed = useSyncExternalStore(subscribe, read, () => false);
-  const label = collapsed ? `Show ${title}` : `Hide ${title}`;
+  const label = collapsed ? `Tampilkan ${title}` : `Sembunyikan ${title}`;
   const Icon = collapsed ? PanelRightOpen : PanelRightClose;
 
   return (

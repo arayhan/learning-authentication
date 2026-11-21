@@ -16,30 +16,30 @@ const ATTACKS: Attack[] = [
     id: "alg-none",
     mode: "none",
     title: "alg: none",
-    forged: 'Header {"alg":"none"}, claims sub=forged-user, and no signature at all.',
-    secureWhy: "The secure verifier pins RS256, so a token that says none is rejected before anything else is checked.",
-    vulnerableWhy: "The vulnerable verifier lets the token pick its own algorithm. It chose none, so no signature was needed.",
+    forged: 'Header {"alg":"none"}, claims sub=forged-user, dan sama sekali tanpa signature.',
+    secureWhy: "Secure verifier mengunci RS256, jadi token yang bilang none ditolak sebelum hal lain dicek.",
+    vulnerableWhy: "Vulnerable verifier membiarkan token memilih algoritmanya sendiri. Ia memilih none, jadi nggak butuh signature.",
   },
   {
     id: "key-confusion",
     mode: "hs256-with-public-key",
-    title: "RS256 to HS256 key confusion",
-    forged: "Header alg HS256, signed with HMAC using the server's PUBLIC key text as the secret. The public key is public, so anyone can do that.",
-    secureWhy: "The secure verifier only ever treats the key as an RSA public key and only accepts RS256, so an HMAC token never verifies.",
-    vulnerableWhy: "The vulnerable verifier switched to HMAC because the header said so, and used the public key as the secret.",
+    title: "Key confusion RS256 ke HS256",
+    forged: "Header alg HS256, ditandatangani dengan HMAC memakai teks PUBLIC key server sebagai secret. Public key itu memang publik, jadi siapa pun bisa melakukannya.",
+    secureWhy: "Secure verifier cuma memperlakukan key sebagai RSA public key dan cuma menerima RS256, jadi token HMAC nggak akan pernah lolos.",
+    vulnerableWhy: "Vulnerable verifier pindah ke HMAC karena header-nya bilang begitu, lalu memakai public key sebagai secret.",
   },
   {
     id: "expired",
     mode: "expired",
-    title: "Expired token",
-    forged: "A genuinely signed RS256 token whose exp was an hour ago.",
-    secureWhy: "The secure verifier requires exp and rejects a token past it.",
-    vulnerableWhy: "The vulnerable verifier checks the signature but never looks at exp (or aud, or iss).",
+    title: "Token expired",
+    forged: "Token RS256 yang ditandatangani asli, tapi exp-nya sejam yang lalu.",
+    secureWhy: "Secure verifier mewajibkan exp dan menolak token yang sudah lewat.",
+    vulnerableWhy: "Vulnerable verifier ngecek signature tapi nggak pernah melihat exp (atau aud, atau iss).",
   },
 ];
 
 type Run = { step: number; token?: string; secure?: { status: number; body: string }; vulnerable?: { status: number; body: string } };
-const STEPS = ["Ask the lab to forge the token", "Present it to the secure verifier", "Present it to the vulnerable verifier"];
+const STEPS = ["Minta lab memalsukan token", "Kirim ke secure verifier", "Kirim ke vulnerable verifier"];
 
 /**
  * Three live attacks on the selected lab 02 implementation. Each card forges a token, then sends the same token to
@@ -52,9 +52,9 @@ export function JwtAttackLab() {
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold">JWT attacks, live</h3>
+        <h3 className="text-sm font-semibold">Attack JWT, langsung</h3>
         <p className="text-xs text-muted-foreground">
-          Runs against the lab at {labBase("02", impl)}. Open the Inspector to watch every request. No account is needed: the forged tokens never touch a real user.
+          Jalan di lab pada {labBase("02", impl)}. Buka Inspector buat mantau tiap request. Nggak perlu akun: token palsunya nggak pernah menyentuh user asli.
         </p>
       </div>
       {/* retrying={false}: nothing polls here, the learner just clicks Run again once the lab is up. */}
@@ -103,7 +103,7 @@ function AttackCard({ attack, impl, onOffline }: { attack: Attack; impl: Impl; o
       const { token } = (await sign.json().catch(() => ({}))) as { token?: string };
       if (!sign.ok || !token) {
         setRun(null);
-        return setError(`The lab refused to forge the token (${sign.status}). Restart the lab.`);
+        return setError(`Lab menolak memalsukan token (${sign.status}). Restart lab-nya.`);
       }
       setRun({ step: 1, token });
       const secure = await profile(token, false);
@@ -153,10 +153,10 @@ function AttackCard({ attack, impl, onOffline }: { attack: Attack; impl: Impl; o
                   <p className={`font-mono text-2xl font-semibold tabular-nums ${res.status === 200 ? "text-destructive" : "text-success"}`}>
                     <span>{res.status}</span>
                   </p>
-                  <p className="text-xs">{res.status === wanted ? why : "Unexpected for this attack."}</p>
+                  <p className="text-xs">{res.status === wanted ? why : "Di luar dugaan untuk attack ini."}</p>
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground">waiting…</p>
+                <p className="text-xs text-muted-foreground">menunggu…</p>
               )}
             </div>
           ))}
@@ -164,16 +164,16 @@ function AttackCard({ attack, impl, onOffline }: { attack: Attack; impl: Impl; o
       )}
       {run?.vulnerable && (
         <p className="text-sm font-medium">
-          {expected ? "Same token, opposite outcome: only the verifier differs." : "Not the expected 401 and 200. Check that the lab is in its default state and run again."}
+          {expected ? "Token sama, hasil berlawanan: yang beda cuma verifier-nya." : "Bukan 401 dan 200 seperti yang diharapkan. Pastikan lab dalam kondisi default lalu jalankan lagi."}
         </p>
       )}
       <Button variant="outline" size="sm" disabled={running} onClick={() => void go()}>
-        Run {attack.id}
+        Jalankan {attack.id}
       </Button>
       {awaitingLogin && (
         <div className="flex items-center gap-2">
-          <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
-          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Sign in again</Button>
+          <p role="status" className="text-sm text-muted-foreground">Login lagi buat nyimpen progress kamu.</p>
+          <Button variant="outline" size="sm" disabled={busy} onClick={openReauth}>Login lagi</Button>
         </div>
       )}
     </section>

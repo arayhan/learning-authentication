@@ -8,7 +8,7 @@ export function BadgeShelf({ earned }: { earned: readonly BadgeId[] }) {
     <section aria-labelledby="badges-h" className="space-y-3">
       <div className="flex items-baseline justify-between">
         <h2 id="badges-h" className="text-sm font-medium">Badges</h2>
-        <span className="text-xs text-muted-foreground">{have.size} / {BADGES.length} earned</span>
+        <span className="text-xs text-muted-foreground">{have.size} / {BADGES.length} didapat</span>
       </div>
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {BADGES.map((b) => {

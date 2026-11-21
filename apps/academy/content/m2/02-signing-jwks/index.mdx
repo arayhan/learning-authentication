@@ -1,44 +1,44 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    Lesson 1 said the signature makes a JWT trustworthy. But trustworthy to *whom*? The API has to check that signature, and checking needs a key. How does a dozen services get that key without also getting the power to forge tokens?
+  <Step id="hook" title="Pembuka">
+    Lesson 1 bilang signature yang bikin JWT bisa dipercaya. Tapi dipercaya oleh *siapa*? API harus mengecek signature itu, dan pengecekannya butuh key. Gimana caranya selusin service dapat key itu tanpa ikut punya kuasa untuk memalsukan token?
 
-    The answer is **asymmetric signatures**: one key signs, a different, public key verifies. Publish the public one on a well-known URL and verification scales to anyone.
+    Jawabannya **asymmetric signature**: satu key untuk men-sign, key lain yang publik untuk memverifikasi. Publikasikan yang publik di URL yang sudah dikenal, dan verifikasi bisa dilakukan siapa saja.
 
-    <Analogy title="The wax seal and the seal catalogue">
-      A king presses a wax seal that only his ring can make. Everyone has the catalogue of royal seals, so anyone can compare, but nobody can make a new impression. Updating the catalogue is how a new ring is introduced.
+    <Analogy title="Stempel RT dan buku contoh stempel">
+      Pak RT punya stempel yang cuma bisa dibuat dari cap asli miliknya. Semua warga punya buku contoh stempel itu, jadi siapa pun bisa membandingkan, tapi nggak ada yang bisa bikin cap baru yang sama persis. Kalau Pak RT ganti stempel, tinggal perbarui buku contohnya.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Signing works in two steps. The issuer builds the **signing input**, `base64url(header) + "." + base64url(payload)`, and signs it with a private key. A verifier recomputes the signature check with a key it trusts and compares.
+  <Step id="concept" title="Konsep">
+    Signing berjalan dalam dua langkah. Issuer menyusun **signing input**, yaitu `base64url(header) + "." + base64url(payload)`, lalu men-sign-nya dengan private key. Verifier menghitung ulang pengecekan signature dengan key yang dia percaya, lalu membandingkan.
 
-    Where the key comes from is the question. The verifier cannot take it from the token: that is the attacker's input. It must come from somewhere the verifier trusts, and for most systems that place is a **JWKS** (JSON Web Key Set, RFC 7517) published by the issuer.
+    Pertanyaannya: key itu datang dari mana? Verifier nggak boleh mengambilnya dari token, karena itu input attacker. Key harus datang dari tempat yang dipercaya verifier, dan di kebanyakan sistem tempat itu adalah **JWKS** (JSON Web Key Set, RFC 7517) yang dipublikasikan issuer.
 
     <SequenceFlow flow={flows.jwksVerify} />
 
-    Notice who does what. The API fetches the key set, picks the key named by the token's `kid`, and verifies. The API never holds anything that can sign.
+    Perhatikan siapa melakukan apa. API mengambil key set, memilih key yang disebut `kid` di token, lalu memverifikasi. API sama sekali nggak memegang apa pun yang bisa men-sign.
   </Step>
 
-  <Step id="algorithms" title="Signature algorithms">
-    The `alg` header names the algorithm (RFC 7518). Three are worth knowing.
+  <Step id="algorithms" title="Algoritma signature">
+    Header `alg` menyebut algoritmanya (RFC 7518). Ada tiga yang perlu kamu kenal.
 
-    | Algorithm | Kind | Who can verify | Who can sign | Signature size | Reach for it when |
+    | Algoritma | Jenis | Siapa yang bisa verify | Siapa yang bisa sign | Ukuran signature | Pakai kalau |
     |---|---|---|---|---|---|
-    | **HS256** | HMAC with a shared secret | Anyone with the secret | Anyone with the secret | 32 bytes | One service both issues and verifies its own tokens |
-    | **RS256** | RSA signature, SHA-256 | Anyone with the public key | Only the private key holder | 256 bytes (2048-bit key) | Many verifiers, widest library support. The lab uses this |
-    | **ES256** | ECDSA on P-256, SHA-256 | Anyone with the public key | Only the private key holder | 64 bytes | Many verifiers and smaller, faster tokens |
+    | **HS256** | HMAC dengan shared secret | Siapa saja yang punya secret | Siapa saja yang punya secret | 32 byte | Satu service menerbitkan dan memverifikasi token-nya sendiri |
+    | **RS256** | Signature RSA, SHA-256 | Siapa saja yang punya public key | Hanya pemegang private key | 256 byte (key 2048-bit) | Banyak verifier, dukungan library paling luas. Lab ini memakainya |
+    | **ES256** | ECDSA di P-256, SHA-256 | Siapa saja yang punya public key | Hanya pemegang private key | 64 byte | Banyak verifier, dan token lebih kecil serta cepat |
 
-    The deciding question is **who needs to verify**. HS256 has no public half: every service that can verify can also forge. That is fine inside one service and wrong across a fleet. With RS256 and ES256, a compromised API leaks only a public key.
+    Pertanyaan penentunya: **siapa yang perlu memverifikasi**. HS256 nggak punya sisi publik: setiap service yang bisa verify juga bisa memalsukan. Itu aman di dalam satu service, tapi salah untuk banyak service. Dengan RS256 dan ES256, API yang bobol cuma membocorkan public key.
 
     <Callout type="warn">
-      Do not pick an algorithm because a tutorial did. Pick it from the trust shape, and then **pin it** in the verifier (lesson 5). Also avoid `none`, which means no signature at all. RFC 8725 says a verifier must reject it unless the application really expects unsigned tokens.
+      Jangan pilih algoritma cuma karena tutorial-nya begitu. Pilih berdasarkan bentuk trust-nya, lalu **pin** di verifier (lesson 5). Hindari juga `none`, yang artinya tanpa signature sama sekali. RFC 8725 bilang verifier harus menolaknya kecuali aplikasi memang mengharapkan token tanpa signature.
     </Callout>
   </Step>
 
-  <Step id="jwks" title="Publishing keys">
-    A **JWK** is a key written as JSON, and a **JWKS** is `{"keys":[…]}`. Here is the shape the lab serves:
+  <Step id="jwks" title="Mempublikasikan key">
+    **JWK** adalah key yang ditulis sebagai JSON, dan **JWKS** adalah `{"keys":[…]}`. Ini bentuk yang disajikan lab:
 
     ```json
     {
@@ -48,142 +48,142 @@ import { flows } from "@/content/flows";
     }
     ```
 
-    | Field | Meaning |
+    | Field | Arti |
     |---|---|
-    | `kty` | Key type: `RSA` here |
-    | `n`, `e` | The RSA public key: modulus and exponent, base64url |
-    | `kid` | The key's id. A token's `kid` header selects this entry |
-    | `alg`, `use` | The intended algorithm, and `sig` for signing |
+    | `kty` | Tipe key: di sini `RSA` |
+    | `n`, `e` | Public key RSA: modulus dan exponent, dalam base64url |
+    | `kid` | Id key. Header `kid` di token memilih entri ini |
+    | `alg`, `use` | Algoritma yang dimaksud, dan `sig` untuk signing |
 
-    This is why `kid` exists. A set can hold several keys at once, and that is how **key rotation** works without an outage:
+    Inilah gunanya `kid`. Satu set bisa berisi beberapa key sekaligus, dan begitulah **key rotation** berjalan tanpa downtime:
 
-    1. Add the new key to the JWKS.
-    2. Start signing with the new `kid`. Old tokens still verify, because the old key is still listed.
-    3. Wait for the longest token lifetime, plus caches, to pass.
-    4. Remove the old key.
+    1. Tambahkan key baru ke JWKS.
+    2. Mulai men-sign dengan `kid` baru. Token lama tetap lolos verifikasi, karena key lamanya masih tercantum.
+    3. Tunggu sampai masa berlaku token terpanjang, plus cache, terlewati.
+    4. Hapus key lama.
 
-    Verifiers **cache** the JWKS and refetch only when they meet an unknown `kid`, with a rate limit. Fetching it on every request would make your identity provider a bottleneck and a single point of failure.
+    Verifier me-**cache** JWKS dan baru mengambil ulang saat ketemu `kid` yang asing, dengan rate limit. Kalau diambil di setiap request, identity provider kamu jadi bottleneck sekaligus single point of failure.
 
     <Callout type="security">
-      Only trust a JWKS from a URL **you** configured for the issuer. Never follow a `jku` or `x5u` header inside the token to fetch keys: that lets an attacker point you at their own key set. RFC 8725 warns against it.
+      Percayai JWKS hanya dari URL yang **kamu** konfigurasi untuk issuer. Jangan pernah mengikuti header `jku` atau `x5u` di dalam token untuk mengambil key: itu membuat attacker bisa mengarahkan kamu ke key set miliknya sendiri. RFC 8725 memperingatkan hal ini.
     </Callout>
 
     <Callout type="info">
-      Worth asking of your own setup: where does **core-api** get the key to verify tokens from **sso-backend**? Is it a fetched, cached JWKS with a refetch on unknown `kid`, a key pasted into config, or a shared secret?
+      Coba tanyakan ke setup kamu sendiri: dari mana **core-api** mendapat key untuk memverifikasi token dari **sso-backend**? JWKS yang diambil dan di-cache dengan refetch saat `kid` asing, key yang ditempel di config, atau shared secret?
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Fetch the lab's public keys, get a real token, and verify it yourself in the browser.
+    Ambil public key milik lab, dapatkan token asli, lalu verifikasi sendiri di browser.
 
     <LabTasks />
 
     <LabConsole
       lab="02"
       actions={[
-        { label: "Fetch JWKS", method: "GET", path: "/.well-known/jwks.json" },
-        { label: "Log in", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
+        { label: "Ambil JWKS", method: "GET", path: "/.well-known/jwks.json" },
+        { label: "Login", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
       ]}
     />
 
-    Click **Fetch JWKS** and note the single key and its `kid`. Then click **Log in**: the lab has a seeded user, `alice@example.com`, so no registration is needed. Copy the `access_token` from the response into the decoder below and press **Verify with lab JWKS**.
+    Klik **Ambil JWKS** dan perhatikan satu key beserta `kid`-nya. Lalu klik **Login**: lab punya user bawaan, `alice@example.com`, jadi nggak perlu register. Salin `access_token` dari response ke decoder di bawah, lalu tekan **Verify pakai JWKS lab**.
 
     <TokenDecoder />
 
-    The decoder fetched the same JWKS you just saw, used `jose` to check the signature with **RS256 pinned**, and required the issuer `http://localhost:4102` and the audience `lab02-api`. That is exactly what an API does.
+    Decoder tadi mengambil JWKS yang sama dengan yang barusan kamu lihat, memakai `jose` untuk mengecek signature dengan **RS256 yang di-pin**, serta mewajibkan issuer `http://localhost:4102` dan audience `lab02-api`. Persis itulah yang dilakukan sebuah API.
 
     <Callout type="info">
-      Switch the selector to TS and fetch the JWKS again. It is the same key: both implementations load the same row from the database, so a token signed by Go verifies in TypeScript and the other way round. That is the point of publishing keys.
+      Ganti selector ke TS lalu ambil JWKS lagi. Key-nya sama: kedua implementasi memuat baris yang sama dari database, jadi token yang di-sign Go lolos verifikasi di TypeScript, dan sebaliknya. Itulah gunanya mempublikasikan key.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    First the JWKS itself: how the public key becomes a JWK.
+  <Step id="code" title="Kode">
+    Pertama JWKS-nya sendiri: bagaimana public key diubah menjadi JWK.
 
     <CodeTabs
       go="labs/02-jwt/go/keys.go#L84-L102"
       ts="labs/02-jwt/ts/src/keys.ts#L34-L38"
       notes={{
-        99: "e and n as unpadded base64url. Only public values are ever written.",
-        101: "kty RSA, kid, alg RS256, use sig: the document you fetched.",
-        36: "Node exports the public key straight to JWK form: n and e only, no private field.",
-        37: "kty RSA, kid, alg RS256, use sig: the same document, in TypeScript.",
+        99: "e dan n sebagai base64url tanpa padding. Yang ditulis hanya nilai publik.",
+        101: "kty RSA, kid, alg RS256, use sig: dokumen yang tadi kamu ambil.",
+        36: "Node meng-export public key langsung ke bentuk JWK: hanya n dan e, tanpa field private.",
+        37: "kty RSA, kid, alg RS256, use sig: dokumen yang sama, dalam TypeScript.",
       }}
     />
 
-    The `kid` is derived, not chosen: the first 16 characters of the base64url sha256 of the public key. It is stable, and both labs compute the same value.
+    `kid` itu diturunkan, bukan dipilih: 16 karakter pertama dari sha256 base64url public key. Nilainya stabil, dan kedua lab menghitung nilai yang sama.
 
     <CodeTabs
       go="labs/02-jwt/go/keys.go#L47-L51"
       ts="labs/02-jwt/ts/src/keys.ts#L15-L17"
       notes={{
-        49: "sha256 of the DER-encoded public key.",
-        50: "base64url, first 16 characters: the kid.",
-        17: "The same recipe: sha256 of the SPKI DER, base64url, sliced to 16 characters.",
+        49: "sha256 dari public key berformat DER.",
+        50: "base64url, 16 karakter pertama: itulah kid.",
+        17: "Resep yang sama: sha256 dari SPKI DER, base64url, dipotong 16 karakter.",
       }}
     />
 
-    Then the verifier side. The key is **the issuer's own**, not anything from the token, and the algorithm list is fixed.
+    Lalu sisi verifier. Key-nya adalah **milik issuer sendiri**, bukan apa pun dari token, dan daftar algoritmanya tetap.
 
     <CodeTabs
       go="labs/02-jwt/go/tokens.go#L35-L50"
       ts="labs/02-jwt/ts/src/tokens.ts#L25-L38"
       notes={{
-        39: "The key comes from the server's own configuration, never from the token.",
-        40: "The only algorithm accepted is RS256.",
-        41: "exp must be present, and not in the past.",
-        42: "The issuer must match.",
-        43: "The audience must match.",
-        31: "jose is told the one algorithm it may accept.",
-        32: "The issuer must match.",
-        33: "The audience must match.",
-        35: "exp must be present.",
+        39: "Key datang dari konfigurasi server sendiri, tidak pernah dari token.",
+        40: "Satu-satunya algoritma yang diterima adalah RS256.",
+        41: "exp harus ada, dan tidak boleh sudah lewat.",
+        42: "Issuer harus cocok.",
+        43: "Audience harus cocok.",
+        31: "jose diberi tahu satu-satunya algoritma yang boleh diterima.",
+        32: "Issuer harus cocok.",
+        33: "Audience harus cocok.",
+        35: "exp harus ada.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Asymmetric signing: the issuer keeps a private key, everyone verifies with a public key.",
-        "HS256 shares one secret, so every verifier can forge. RS256 and ES256 do not.",
-        "A JWKS is a public set of keys at a well-known URL. The token's kid picks the key.",
-        "Rotate keys by publishing the new one first, signing with it, then retiring the old key.",
-        "Fetch keys from a URL you configured, cache them, refetch on unknown kid. Never from a header in the token.",
+        "Asymmetric signing: issuer menyimpan private key, semua orang memverifikasi dengan public key.",
+        "HS256 berbagi satu secret, jadi setiap verifier bisa memalsukan. RS256 dan ES256 tidak.",
+        "JWKS adalah kumpulan public key di URL yang sudah dikenal. kid di token memilih key-nya.",
+        "Rotate key dengan mempublikasikan yang baru dulu, men-sign dengannya, baru memensiunkan key lama.",
+        "Ambil key dari URL yang kamu konfigurasi, cache, refetch saat kid asing. Jangan pernah dari header di dalam token.",
       ]}
       interview={[
         {
-          q: "HS256 versus RS256: when would you use each?",
-          a: "HS256 uses one shared secret for signing and verifying, so it suits a single service that issues and checks its own tokens. RS256 signs with a private key and verifies with a public one, so it suits many verifiers: a compromised API leaks only a public key and cannot mint tokens.",
+          q: "HS256 versus RS256: kapan memakai masing-masing?",
+          a: "HS256 memakai satu shared secret untuk sign dan verify, jadi cocok untuk satu service yang menerbitkan dan mengecek token-nya sendiri. RS256 men-sign dengan private key dan memverifikasi dengan public key, jadi cocok untuk banyak verifier: API yang bobol hanya membocorkan public key dan nggak bisa membuat token.",
         },
         {
-          q: "What is a JWKS and what is kid for?",
-          a: "A JSON Web Key Set is a JSON document of public keys, usually at /.well-known/jwks.json. Each key has a kid. A token's header carries the kid of the key that signed it, so the verifier can pick the right key, which also makes rotation possible.",
+          q: "JWKS itu apa dan kid gunanya apa?",
+          a: "JSON Web Key Set adalah dokumen JSON berisi public key, biasanya di /.well-known/jwks.json. Setiap key punya kid. Header token membawa kid dari key yang men-sign-nya, jadi verifier bisa memilih key yang tepat, dan ini juga yang memungkinkan rotation.",
         },
         {
-          q: "How do you rotate a signing key without breaking clients?",
-          a: "Publish the new public key in the JWKS first, switch the issuer to sign with the new kid, and keep the old key listed until every token signed with it has expired and caches have refreshed. Then remove it. Verifiers refetch the JWKS when they see an unknown kid.",
+          q: "Bagaimana rotate signing key tanpa merusak client?",
+          a: "Publikasikan public key baru di JWKS lebih dulu, pindahkan issuer untuk men-sign dengan kid baru, dan biarkan key lama tetap tercantum sampai semua token yang di-sign dengannya expired dan cache sudah ter-refresh. Setelah itu hapus. Verifier mengambil ulang JWKS saat melihat kid yang belum dikenal.",
         },
         {
-          q: "How should an API get the key to verify a token?",
-          a: "From the issuer's configured JWKS URL, cached, never from data in the token. A jku or x5u header inside the token is attacker-controlled, so following it lets an attacker supply their own key.",
+          q: "Dari mana API seharusnya mendapat key untuk memverifikasi token?",
+          a: "Dari URL JWKS issuer yang sudah dikonfigurasi, di-cache, tidak pernah dari data di dalam token. Header jku atau x5u di dalam token dikontrol attacker, jadi mengikutinya membuat attacker bisa menyuplai key-nya sendiri.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why a public JWKS endpoint does not let anyone forge tokens, and how a new key reaches the services that verify."
+      prompt="Jelaskan ke teman satu tim kenapa endpoint JWKS yang publik nggak membuat siapa pun bisa memalsukan token, dan bagaimana key baru sampai ke service yang memverifikasi."
       rubric={[
-        "The JWKS holds only public keys, which can verify but not sign",
-        "The private key never leaves the issuer",
-        "A token's kid selects which key to use",
-        "Rotation: publish the new key, sign with it, retire the old one after tokens expire, and verifiers refetch on an unknown kid",
+        "JWKS hanya berisi public key, yang bisa verify tapi tidak bisa sign",
+        "Private key nggak pernah keluar dari issuer",
+        "kid di token memilih key mana yang dipakai",
+        "Rotation: publikasikan key baru, sign dengannya, pensiunkan yang lama setelah token expired, dan verifier refetch saat kid asing",
       ]}
     />
   </Step>

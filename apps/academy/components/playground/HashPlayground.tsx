@@ -52,13 +52,13 @@ export function HashPlayground() {
 
   const cell = (label: string, value: string | undefined) => (
     <output aria-label={label} className="block break-all font-mono text-xs">
-      {ready && value ? value : <span className="text-muted-foreground">hashing…</span>}
+      {ready && value ? value : <span className="text-muted-foreground">lagi nge-hash…</span>}
     </output>
   );
 
   return (
     <div className="max-w-3xl space-y-4 rounded-lg border p-4">
-      <h3 className="text-sm font-semibold">Hash playground</h3>
+      <h3 className="text-sm font-semibold">Playground hash</h3>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="space-y-1 text-xs font-medium">
           Password
@@ -71,8 +71,8 @@ export function HashPlayground() {
             </label>
             <div className="flex gap-1.5">
               <Input id={`${uid}-${k}`} value={form[k]} onChange={(e) => set({ [k]: e.target.value })} spellCheck={false} autoComplete="off" className="font-mono" />
-              <Button type="button" variant="outline" size="sm" onClick={() => set({ [k]: randomSalt() })} aria-label={`New random ${k === "saltA" ? "salt A" : "salt B"}`}>
-                New
+              <Button type="button" variant="outline" size="sm" onClick={() => set({ [k]: randomSalt() })} aria-label={`Salt random baru ${k === "saltA" ? "A" : "B"}`}>
+                Baru
               </Button>
             </div>
           </div>
@@ -81,7 +81,7 @@ export function HashPlayground() {
 
       <label className="block space-y-1 text-xs font-medium">
         <span>
-          Iterations: <span className="font-mono tabular-nums">{form.iterations.toLocaleString("en-US")}</span>
+          Iterasi: <span className="font-mono tabular-nums">{form.iterations.toLocaleString("id-ID")}</span>
         </span>
         <input
           type="range"
@@ -98,25 +98,25 @@ export function HashPlayground() {
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 font-medium"><span className="sr-only">Algorithm</span></th>
+              <th className="px-3 py-2 font-medium"><span className="sr-only">Algoritma</span></th>
               <th className="px-3 py-2 font-medium">Salt A</th>
               <th className="px-3 py-2 font-medium">Salt B</th>
             </tr>
           </thead>
           <tbody className="[&_td]:border-t [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">
             <tr>
-              <th scope="row" className="px-3 py-2 text-xs font-medium">SHA-256 <span className="block font-normal text-muted-foreground">instant: built to be fast</span></th>
-              <td>{cell("SHA-256 with salt A", result?.a.sha)}</td>
-              <td>{cell("SHA-256 with salt B", result?.b.sha)}</td>
+              <th scope="row" className="px-3 py-2 text-xs font-medium">SHA-256 <span className="block font-normal text-muted-foreground">instan: emang dibuat ngebut</span></th>
+              <td>{cell("SHA-256 dengan salt A", result?.a.sha)}</td>
+              <td>{cell("SHA-256 dengan salt B", result?.b.sha)}</td>
             </tr>
             <tr>
-              <th scope="row" className="px-3 py-2 text-xs font-medium">PBKDF2-SHA256 <span className="block font-normal text-muted-foreground">{form.iterations.toLocaleString("en-US")} iterations</span></th>
+              <th scope="row" className="px-3 py-2 text-xs font-medium">PBKDF2-SHA256 <span className="block font-normal text-muted-foreground">{form.iterations.toLocaleString("id-ID")} iterasi</span></th>
               <td>
-                {cell("PBKDF2 with salt A", result?.a.pbkdf2)}
+                {cell("PBKDF2 dengan salt A", result?.a.pbkdf2)}
                 {ready && result && <span className="mt-1 block text-xs tabular-nums text-muted-foreground">{Math.max(1, Math.round(result.a.ms))} ms</span>}
               </td>
               <td>
-                {cell("PBKDF2 with salt B", result?.b.pbkdf2)}
+                {cell("PBKDF2 dengan salt B", result?.b.pbkdf2)}
                 {ready && result && <span className="mt-1 block text-xs tabular-nums text-muted-foreground">{Math.max(1, Math.round(result.b.ms))} ms</span>}
               </td>
             </tr>
@@ -125,8 +125,8 @@ export function HashPlayground() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Same password, different salt, completely different hash. Drag the slider: SHA-256 stays instant, PBKDF2 gets slower on purpose. OWASP asks for at least 600,000 iterations of PBKDF2-HMAC-SHA256.
-        The lab itself uses <strong>argon2id</strong>, which is memory-hard; the browser demo does not run it.
+        Password sama, salt beda, hash-nya beda total. Geser slider-nya: SHA-256 tetap instan, PBKDF2 sengaja dibikin makin lambat. OWASP menyarankan minimal 600.000 iterasi PBKDF2-HMAC-SHA256.
+        Lab-nya sendiri pakai <strong>argon2id</strong> yang memory-hard; demo di browser ini nggak menjalankannya.
       </p>
     </div>
   );

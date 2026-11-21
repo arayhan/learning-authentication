@@ -7,7 +7,7 @@ import { currentUser } from "@/lib/auth/session";
 export default async function Home() {
   const user = await currentUser();
   return (
-    <AppShell userName={user.displayName} left={<ModuleNav />} right={<XpGuide />} rightTitle="XP guide">
+    <AppShell userName={user.displayName} left={<ModuleNav />} right={<XpGuide />} rightTitle="Panduan XP">
       <Dashboard name={user.displayName} />
     </AppShell>
   );

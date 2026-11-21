@@ -39,7 +39,7 @@ describe("HashPlayground", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "hunter2" } });
     fireEvent.change(screen.getByLabelText("Salt A"), { target: { value: "aaaa" } });
     fireEvent.change(screen.getByLabelText("Salt B"), { target: { value: "bbbb" } });
-    fireEvent.change(screen.getByLabelText(/Iterations/), { target: { value: "1000" } });
+    fireEvent.change(screen.getByLabelText(/Iterasi/), { target: { value: "1000" } });
     await waitFor(() => expect(out(/PBKDF2.*salt A/)).toMatch(/^[0-9a-f]{64}$/));
     await waitFor(() => expect(out(/PBKDF2.*salt B/)).toMatch(/^[0-9a-f]{64}$/));
     const [pa, pb] = [out(/PBKDF2.*salt A/), out(/PBKDF2.*salt B/)];
@@ -55,8 +55,8 @@ describe("HashPlayground", () => {
     wrap(<HashPlayground />);
     expect(screen.getByText(/argon2id/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "x" } });
-    expect(screen.getAllByText("hashing…").length).toBeGreaterThan(0);
-    await waitFor(() => expect(screen.queryByText("hashing…")).not.toBeInTheDocument());
+    expect(screen.getAllByText("lagi nge-hash…").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText("lagi nge-hash…")).not.toBeInTheDocument());
   });
 });
 
@@ -73,11 +73,11 @@ describe("CsrfSim", () => {
     );
     return posts;
   }
-  const send = () => userEvent.click(screen.getByRole("button", { name: /send forged request/i }));
+  const send = () => userEvent.click(screen.getByRole("button", { name: /kirim forged request/i }));
   const toggle = (name: RegExp) => userEvent.click(screen.getByRole("checkbox", { name }));
   const verdict = () => {
-    const text = within(screen.getByRole("status", { name: "Result" })).getByText(/forged request/i).textContent ?? "";
-    return /blocked/i.test(text) ? "blocked" : /succeeded/i.test(text) ? "succeeded" : text;
+    const text = within(screen.getByRole("status", { name: "Hasil" })).getByText(/forged request/i).textContent ?? "";
+    return /diblokir/i.test(text) ? "blocked" : /berhasil/i.test(text) ? "succeeded" : text;
   };
 
   it("the forged request goes through with every defense off", async () => {
@@ -155,7 +155,7 @@ describe("FixationAttack", () => {
     );
     return { lab, posts };
   }
-  const run = (mode: "vulnerable" | "secure") => userEvent.click(screen.getByRole("button", { name: new RegExp(`run ${mode}`, "i") }));
+  const run = (mode: "vulnerable" | "secure") => userEvent.click(screen.getByRole("button", { name: new RegExp(`jalankan ${mode}`, "i") }));
 
   it("sends the attack event only after both modes were observed", async () => {
     const { lab, posts } = fakeLab();
@@ -181,7 +181,7 @@ describe("FixationAttack", () => {
     const { posts } = fakeLab({ offline: true });
     wrap(<FixationAttack />);
     await run("vulnerable");
-    expect(await screen.findByText("Lab 01 (Go) is not running")).toBeInTheDocument();
+    expect(await screen.findByText("Lab 01 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 01 --go")).toBeInTheDocument();
     expect(posts).toEqual([]);
   });

@@ -58,7 +58,7 @@ function TaskList({ lessonId, tasks, lab }: { lessonId: string; tasks: LabTask[]
 
   return (
     <div className="max-w-3xl space-y-3 rounded-lg border p-4">
-      <h3 className="text-sm font-semibold">Lab tasks</h3>
+      <h3 className="text-sm font-semibold">Task lab</h3>
       {status === "offline" && <OfflineCard lab={lab} impl={impl} />}
       <ul className="space-y-2">
         {tasks.map((t) => {
@@ -69,7 +69,7 @@ function TaskList({ lessonId, tasks, lab }: { lessonId: string; tasks: LabTask[]
               <div>
                 <p className={done ? "text-muted-foreground line-through" : undefined}>
                   {t.label}
-                  <span className="sr-only">{done ? " (done)" : " (not done)"}</span>
+                  <span className="sr-only">{done ? " (selesai)" : " (belum)"}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">{t.hint}</p>
               </div>

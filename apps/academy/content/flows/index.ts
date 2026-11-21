@@ -5,7 +5,7 @@ import { m3Flows } from "./m3";
 
 const demo: Flow = {
   id: "demo",
-  title: "Login with a session cookie",
+  title: "Login dengan session cookie",
   actors: [
     { id: "browser", label: "Browser", kind: "browser" },
     { id: "server", label: "Server", kind: "server" },
@@ -17,17 +17,17 @@ const demo: Flow = {
       to: "server",
       label: "POST /login",
       http: "POST /login HTTP/1.1\nHost: app.example.com\nContent-Type: application/json\n\n{\"email\":\"sam@example.com\",\"password\":\"correct horse\"}",
-      note: "The browser sends the credentials over HTTPS.",
+      note: "Browser mengirim credential lewat HTTPS.",
     },
-    { from: "server", to: "db", label: "SELECT user", note: "The server looks the user up by email." },
-    { from: "server", to: "server", label: "verify hash", note: "It checks the password against the stored argon2id hash." },
-    { from: "server", to: "db", label: "INSERT session", note: "Only the hash of the session token is stored." },
+    { from: "server", to: "db", label: "SELECT user", note: "Server mencari user berdasarkan email." },
+    { from: "server", to: "server", label: "verify hash", note: "Dia mengecek password terhadap hash argon2id yang tersimpan." },
+    { from: "server", to: "db", label: "INSERT session", note: "Hanya hash dari session token yang disimpan." },
     {
       from: "server",
       to: "browser",
       label: "200 + Set-Cookie",
       http: "HTTP/1.1 200 OK\nSet-Cookie: sid=<token>; HttpOnly; Secure; SameSite=Lax; Path=/",
-      note: "The cookie is HttpOnly, so page scripts cannot read it.",
+      note: "Cookie itu HttpOnly, jadi script di halaman nggak bisa membacanya.",
     },
   ],
 };

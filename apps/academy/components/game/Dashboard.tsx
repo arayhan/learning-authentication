@@ -17,8 +17,8 @@ export function Dashboard({ name }: { name: string }) {
     <div className="mx-auto max-w-3xl space-y-10">
       <section className="space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {name}</h1>
-          <p className="text-sm text-muted-foreground">Learn authentication by building and breaking it.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Selamat datang lagi, {name}</h1>
+          <p className="text-sm text-muted-foreground">Belajar authentication dengan cara bikin dan bobol sendiri.</p>
         </div>
         <div className="space-y-4 rounded-lg border p-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -29,10 +29,10 @@ export function Dashboard({ name }: { name: string }) {
         </div>
         {next ? (
           <Link href={lessonUrl(next)} className={buttonVariants({ size: "lg" })}>
-            Continue: {next.title}
+            Lanjut: {next.title}
           </Link>
         ) : (
-          <p className="text-sm text-muted-foreground">Course complete. Revisit any lesson from the map below.</p>
+          <p className="text-sm text-muted-foreground">Course selesai. Buka lagi lesson mana pun dari peta di bawah.</p>
         )}
       </section>
       <SkillMap completed={state.completed} />

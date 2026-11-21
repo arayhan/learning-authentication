@@ -1,165 +1,165 @@
 import { flows } from "@/content/flows";
 
 <LessonSteps>
-  <Step id="hook" title="Hook">
-    JWT cryptography is rarely the weak point. The verifier code around it is. Most real JWT breaches did not break RSA or HMAC: they talked a verifier into **not checking**, using fields the attacker wrote themselves.
+  <Step id="hook" title="Pembuka">
+    Kriptografi JWT jarang jadi titik lemah. Yang lemah adalah kode verifier di sekelilingnya. Kebanyakan kebobolan JWT di dunia nyata bukan karena RSA atau HMAC dijebol: mereka membujuk verifier supaya **tidak mengecek**, memakai field yang ditulis attacker sendiri.
 
-    Almost all of it comes down to one mistake: trusting the token to describe how it should be verified.
+    Hampir semuanya bermuara pada satu kesalahan: mempercayai token untuk menjelaskan bagaimana dia harus diverifikasi.
 
-    <Analogy title="The guard and the checked-by line">
-      A guard compares each pass against the list of approved stamps. Then someone hands over a pass with the line "checked by: no one needed". A guard who reads that line and waves them through has let the visitor write the rule.
+    <Analogy title="Satpam dan kolom 'diperiksa oleh'">
+      Satpam kompleks mencocokkan tiap tanda pengenal dengan daftar stempel yang sah. Lalu ada yang menyodorkan kartu bertuliskan "diperiksa oleh: tidak perlu". Satpam yang membaca tulisan itu lalu mempersilakan masuk berarti membiarkan tamu menulis aturannya sendiri.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    A verifier receives bytes from the network and must decide whether to believe them. Every part of the token is **untrusted input** until the signature is checked, and the header is the most dangerous part: it says which algorithm and which key to use.
+  <Step id="concept" title="Konsep">
+    Verifier menerima byte dari jaringan dan harus memutuskan apakah akan mempercayainya. Setiap bagian token adalah **input yang nggak dipercaya** sampai signature-nya dicek, dan header adalah bagian paling berbahaya: dia menyebut algoritma dan key mana yang dipakai.
 
     <SequenceFlow flow={flows.algNone} />
 
-    The rule that kills the whole class is simple, and it is in RFC 8725, the JWT best current practices:
+    Aturan yang membunuh seluruh kelas serangan ini sederhana, dan ada di RFC 8725, JWT best current practices:
 
-    1. **Pin the algorithm.** The verifier decides which algorithm it accepts, per issuer. It never uses the token's `alg` to choose.
-    2. **Bind the key to the algorithm.** An RSA public key is only ever used for an RSA verification, never handed to an HMAC.
-    3. **Validate the claims.** `exp`, `iss` and `aud` are checked every time. A valid signature is where verification starts, not where it ends.
+    1. **Pin algoritmanya.** Verifier yang memutuskan algoritma apa yang dia terima, per issuer. Dia nggak pernah memakai `alg` dari token untuk memilih.
+    2. **Ikat key ke algoritmanya.** Public key RSA hanya dipakai untuk verifikasi RSA, nggak pernah diserahkan ke HMAC.
+    3. **Validasi claims.** `exp`, `iss`, dan `aud` dicek setiap kali. Signature valid adalah awal verifikasi, bukan akhirnya.
 
-    The lab has two verifiers behind `GET /api/profile`. The default is **secure** and does all three. A request with `X-Lab-Mode: vulnerable` goes to a deliberately broken one, shown below, so you can watch each mistake fail in the real world.
+    Lab punya dua verifier di balik `GET /api/profile`. Default-nya **aman** dan melakukan ketiganya. Request dengan `X-Lab-Mode: vulnerable` diarahkan ke verifier yang sengaja dirusak, seperti yang ditampilkan di bawah, supaya kamu bisa melihat setiap kesalahan gagal di dunia nyata.
   </Step>
 
-  <Step id="flaws" title="The attack catalogue">
-    | Attack | What the attacker controls | Why it works | Defense |
+  <Step id="flaws" title="Katalog serangan">
+    | Serangan | Yang dikontrol attacker | Kenapa berhasil | Pertahanan |
     |---|---|---|---|
-    | **`alg: none`** | The `alg` header | The verifier sees `none` and skips the signature | Pin algorithms. Reject `none` |
-    | **RS256 to HS256 confusion** | The `alg` header | The verifier uses the RSA **public** key bytes as an HMAC secret, and the attacker knows them | Pin algorithms. Bind each key to one algorithm |
-    | **Expired or foreign token** | Nothing: a replayed, genuine token | Only the signature is checked | Require `exp`, `iss` and `aud` |
-    | **`kid` injection** | The `kid` header | The server uses `kid` in a file path or an SQL string | Treat `kid` as a lookup into a fixed set. Parameterize queries |
-    | **`jku` / `x5u` / `jwk` header** | A URL or a key inside the header | The verifier fetches or trusts the attacker's key | Ignore those headers. Use only your configured JWKS |
-    | **Weak HS256 secret** | Nothing | A short secret can be brute-forced offline from one captured token | A random secret of at least 256 bits, or an asymmetric algorithm |
-    | **Token in a URL** | Nothing | URLs leak into logs, history and `Referer` | Send it in the `Authorization` header only |
+    | **`alg: none`** | Header `alg` | Verifier melihat `none` lalu melewatkan signature | Pin algoritma. Tolak `none` |
+    | **Confusion RS256 ke HS256** | Header `alg` | Verifier memakai byte **public** key RSA sebagai secret HMAC, dan attacker tahu byte itu | Pin algoritma. Ikat tiap key ke satu algoritma |
+    | **Token expired atau asing** | Nggak ada: token asli yang diputar ulang | Hanya signature yang dicek | Wajibkan `exp`, `iss`, dan `aud` |
+    | **Injeksi `kid`** | Header `kid` | Server memakai `kid` di path file atau string SQL | Perlakukan `kid` sebagai lookup ke himpunan tetap. Parameterize query |
+    | **Header `jku` / `x5u` / `jwk`** | URL atau key di dalam header | Verifier mengambil atau mempercayai key milik attacker | Abaikan header itu. Pakai hanya JWKS yang kamu konfigurasi |
+    | **Secret HS256 yang lemah** | Nggak ada | Secret pendek bisa di-brute force offline dari satu token yang tertangkap | Secret acak minimal 256 bit, atau algoritma asimetris |
+    | **Token di URL** | Nggak ada | URL bocor ke log, history, dan `Referer` | Kirim hanya lewat header `Authorization` |
 
-    The first three are the ones you will break in a moment. A few details are worth knowing.
+    Tiga yang pertama akan kamu bobol sebentar lagi. Ada beberapa detail yang perlu diketahui.
 
-    - **Key confusion** needs the verifier's code to use one `key` value for any algorithm. A library that takes `(token, key)` and lets the token pick the algorithm is exactly that. This is why modern libraries want you to pass the allowed algorithms.
-    - **A token for the wrong audience** is a quieter version of the same bug. One issuer often serves many APIs, and without an `aud` check any API's token opens any other.
-    - **There is no "just decode" shortcut.** Code that only base64-decodes the payload and reads `sub` is trusting an unsigned note.
+    - **Key confusion** butuh kode verifier yang memakai satu nilai `key` untuk algoritma apa pun. Library yang menerima `(token, key)` dan membiarkan token memilih algoritma persis seperti itu. Makanya library modern minta kamu menyebutkan algoritma yang diizinkan.
+    - **Token untuk audience yang salah** adalah versi lebih halus dari bug yang sama. Satu issuer sering melayani banyak API, dan tanpa pengecekan `aud`, token satu API bisa membuka API lain.
+    - **Nggak ada jalan pintas "decode saja".** Kode yang hanya men-decode base64 payload lalu membaca `sub` sedang mempercayai catatan tanpa tanda tangan.
 
     <Callout type="info">
-      Worth asking of your own setup: does **core-api** pass an explicit algorithm list to its JWT library, and does it check `iss` and `aud` as well as `exp`? Which library and version does it use, and what are its defaults?
+      Coba tanyakan ke setup kamu sendiri: apakah **core-api** memberikan daftar algoritma eksplisit ke library JWT-nya, dan apakah dia mengecek `iss` dan `aud` selain `exp`? Library dan versi apa yang dipakai, dan apa default-nya?
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek pemahaman">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sebanyak yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
-  <Step id="breakit" title="Break it">
-    Three live attacks against the lab. Each card asks the lab to forge a token (the helper `POST /__attack/sign` exists only in vulnerable mode), then sends **the same token** to `GET /api/profile` twice: once to the secure verifier and once to the vulnerable one.
+  <Step id="breakit" title="Bobol sendiri">
+    Tiga serangan langsung ke lab. Tiap kartu meminta lab memalsukan token (helper `POST /__attack/sign` hanya ada di mode vulnerable), lalu mengirim **token yang sama** ke `GET /api/profile` dua kali: sekali ke verifier yang aman dan sekali ke yang vulnerable.
 
-    Click **Run** on each card. You are looking for `401` on the left and `200` on the right.
+    Klik **Jalankan** di tiap kartu. Yang kamu cari: `401` di kiri dan `200` di kanan.
 
     <JwtAttackLab />
 
-    What each card shows:
+    Yang ditunjukkan tiap kartu:
 
-    - **alg: none** was accepted by the vulnerable verifier with no signature at all. The secure verifier rejected it because it only accepts RS256.
-    - **Key confusion** was signed with HMAC, using the public key's PEM text as the secret. An attacker can rebuild that text from the public JWKS from lesson 2, so no secret was needed. The secure verifier never performs an HMAC check, so the token fails.
-    - **Expired** carries a genuine RS256 signature, only its `exp` is an hour old. The vulnerable verifier never reads `exp`.
+    - **alg: none** diterima verifier vulnerable tanpa signature sama sekali. Verifier yang aman menolaknya karena hanya menerima RS256.
+    - **Key confusion** di-sign dengan HMAC, memakai teks PEM public key sebagai secret. Attacker bisa menyusun ulang teks itu dari JWKS publik di lesson 2, jadi nggak perlu secret apa pun. Verifier yang aman nggak pernah melakukan pengecekan HMAC, jadi token itu gagal.
+    - **Expired** membawa signature RS256 yang asli, hanya `exp`-nya yang berumur satu jam. Verifier vulnerable nggak pernah membaca `exp`.
 
-    Open the Inspector and look at the `401` rows. They carry `WWW-Authenticate: Bearer error="invalid_token"`, which is how a server tells a client that the token, not the request, was the problem (RFC 6750).
+    Buka Inspector dan lihat baris `401`. Barisnya membawa `WWW-Authenticate: Bearer error="invalid_token"`, cara server memberi tahu client bahwa yang bermasalah adalah token-nya, bukan request-nya (RFC 6750).
 
     <Callout type="security">
-      The vulnerable mode is a switch on the server, so it can be shown. A real API has no such switch, and the same flaws sit in code like the listing below. Reviewing JWT handling means reading it for exactly these four flaws.
+      Mode vulnerable itu saklar di server, supaya bisa didemokan. API sungguhan nggak punya saklar seperti itu, dan kelemahan yang sama bersembunyi di kode seperti listing di bawah. Me-review penanganan JWT berarti membacanya untuk mencari tepat keempat kelemahan ini.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    The broken verifier. Every flaw is a real bug class, and each is annotated in the file as FLAW 1 to 4.
+  <Step id="code" title="Kode">
+    Verifier yang rusak. Setiap kelemahan adalah kelas bug yang nyata, dan masing-masing diberi anotasi di file sebagai FLAW 1 sampai 4.
 
     <CodeTabs
       go="labs/02-jwt/go/naive.go#L14-L64"
       ts="labs/02-jwt/ts/src/naive.ts#L4-L37"
       notes={{
-        40: "FLAW 1: the alg comes from the token, which the attacker wrote.",
-        42: "FLAW 2: alg none needs no signature, whatever sits in the signature slot.",
-        45: "FLAW 3: the PUBLIC key text becomes an HMAC secret. Anyone can compute that.",
-        51: "FLAW 4: exp, aud and iss are never looked at.",
-        22: "FLAW 1 in TypeScript: the alg is whatever the header says.",
-        24: "FLAW 2: none returns the claims unverified.",
-        27: "FLAW 3: the public PEM as an HMAC key.",
-        30: "FLAW 4: no exp, aud or iss check.",
+        40: "FLAW 1: alg diambil dari token, yang ditulis attacker.",
+        42: "FLAW 2: alg none nggak butuh signature, apa pun yang ada di slot signature.",
+        45: "FLAW 3: teks key PUBLIC dijadikan secret HMAC. Siapa pun bisa menghitungnya.",
+        51: "FLAW 4: exp, aud, dan iss nggak pernah dilihat.",
+        22: "FLAW 1 di TypeScript: alg adalah apa pun yang dikatakan header.",
+        24: "FLAW 2: none mengembalikan claims tanpa verifikasi.",
+        27: "FLAW 3: PEM publik sebagai key HMAC.",
+        30: "FLAW 4: tanpa pengecekan exp, aud, atau iss.",
       }}
     />
 
-    How the lab builds the forgeries. None of them needs a secret: unsigned, an HMAC with a public key, and a real signature over an old `exp`.
+    Bagaimana lab membuat pemalsuannya. Tidak satu pun butuh secret: tanpa signature, HMAC dengan public key, dan signature asli atas `exp` yang sudah lampau.
 
     <CodeTabs
       go="labs/02-jwt/go/tokens.go#L70-L86"
       ts="labs/02-jwt/ts/src/tokens.ts#L52-L70"
       notes={{
-        72: "none: just set alg and leave the signature empty.",
-        74: "HS256 with a header the verifier will believe.",
-        83: "Expired: exp forced an hour into the past.",
-        54: "none: alg set, no signature.",
-        57: "HS256, signed below with the public key text.",
-        66: "Expired: exp forced into the past.",
+        72: "none: cukup set alg dan biarkan signature kosong.",
+        74: "HS256 dengan header yang akan dipercaya verifier.",
+        83: "Expired: exp dipaksa mundur satu jam.",
+        54: "none: alg di-set, tanpa signature.",
+        57: "HS256, di-sign di bawah dengan teks public key.",
+        66: "Expired: exp dipaksa ke masa lalu.",
       }}
     />
 
-    Now compare with the verifier you read in lesson 2: it passes `["RS256"]` as the only allowed algorithm and requires `exp`, `iss` and `aud`. Those three arguments are the whole difference.
+    Sekarang bandingkan dengan verifier yang kamu baca di lesson 2: dia memberikan `["RS256"]` sebagai satu-satunya algoritma yang diizinkan dan mewajibkan `exp`, `iss`, dan `aud`. Ketiga argumen itulah seluruh perbedaannya.
 
     <CodeTabs
       go="labs/02-jwt/go/tokens.go#L35-L50"
       ts="labs/02-jwt/ts/src/tokens.ts#L25-L38"
       notes={{
-        40: "Pinned: RS256 only.",
-        41: "exp is required.",
-        42: "iss is checked.",
-        43: "aud is checked.",
-        31: "Pinned: RS256 only.",
-        32: "iss is checked.",
-        33: "aud is checked.",
-        35: "exp is required.",
+        40: "Di-pin: hanya RS256.",
+        41: "exp wajib ada.",
+        42: "iss dicek.",
+        43: "aud dicek.",
+        31: "Di-pin: hanya RS256.",
+        32: "iss dicek.",
+        33: "aud dicek.",
+        35: "exp wajib ada.",
       }}
     />
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "Everything in a token is untrusted until the signature is verified, and the header is the most dangerous part.",
-        "alg: none and RS256 to HS256 confusion both come from letting the token choose the algorithm.",
-        "Pin the algorithm in the verifier, and use each key only for its own algorithm (RFC 8725).",
-        "A valid signature is not enough: require exp, iss and aud, so old and foreign tokens are rejected.",
-        "Never follow jku, x5u or jwk headers, and never trust a kid blindly.",
+        "Semua yang ada di token nggak dipercaya sampai signature diverifikasi, dan header adalah bagian paling berbahaya.",
+        "alg: none dan confusion RS256 ke HS256 sama-sama muncul karena membiarkan token memilih algoritma.",
+        "Pin algoritma di verifier, dan pakai tiap key hanya untuk algoritmanya sendiri (RFC 8725).",
+        "Signature valid saja nggak cukup: wajibkan exp, iss, dan aud, supaya token lama dan token asing ditolak.",
+        "Jangan pernah mengikuti header jku, x5u, atau jwk, dan jangan percaya kid begitu saja.",
       ]}
       interview={[
         {
-          q: "What is the alg: none attack?",
-          a: "The attacker builds a token with the alg header set to none and an empty signature. A verifier that obeys the header skips signature checking and accepts any claims, so the attacker can claim to be any user. The fix is for the verifier to pin the algorithms it accepts and reject none.",
+          q: "Serangan alg: none itu apa?",
+          a: "Attacker membuat token dengan header alg diset none dan signature kosong. Verifier yang menurut pada header melewatkan pengecekan signature dan menerima claims apa pun, sehingga attacker bisa mengaku sebagai user mana saja. Perbaikannya: verifier mem-pin algoritma yang dia terima dan menolak none.",
         },
         {
-          q: "Explain the RS256 to HS256 key confusion attack.",
-          a: "The server verifies with an RSA public key. The attacker sets alg to HS256 and signs the token with HMAC, using that public key as the secret, which they know because it is public. A verifier that trusts the header uses its public key as the HMAC key, the check passes, and the forged token is accepted. The fix is to pin RS256 and never pass the same key into different algorithms.",
+          q: "Jelaskan serangan key confusion RS256 ke HS256.",
+          a: "Server memverifikasi dengan public key RSA. Attacker men-set alg ke HS256 dan men-sign token dengan HMAC, memakai public key itu sebagai secret, yang dia tahu karena memang publik. Verifier yang percaya pada header memakai public key-nya sebagai key HMAC, pengecekan lolos, dan token palsu diterima. Perbaikannya: pin RS256 dan jangan pernah memasukkan key yang sama ke algoritma yang berbeda.",
         },
         {
-          q: "What must you validate on every incoming JWT?",
-          a: "The signature with an algorithm you pinned, then exp (so expired tokens fail), iss (only your trusted issuer) and aud (the token is meant for this API). Optionally nbf. This is the checklist in RFC 8725.",
+          q: "Apa yang harus divalidasi pada setiap JWT yang masuk?",
+          a: "Signature dengan algoritma yang kamu pin, lalu exp (supaya token expired gagal), iss (hanya issuer terpercaya kamu), dan aud (token memang untuk API ini). Opsional nbf. Ini checklist di RFC 8725.",
         },
         {
-          q: "How do you review code that verifies JWTs?",
-          a: "Check that the allowed algorithms are passed explicitly and none is excluded, that the key type matches the algorithm, that exp, iss and aud are enforced, that the key comes from configured trust and not from the token (kid, jku, x5u), and that no code path decodes the payload without verifying.",
+          q: "Bagaimana cara me-review kode yang memverifikasi JWT?",
+          a: "Cek bahwa algoritma yang diizinkan diberikan secara eksplisit dan none tidak termasuk, bahwa tipe key cocok dengan algoritmanya, bahwa exp, iss, dan aud ditegakkan, bahwa key berasal dari trust yang dikonfigurasi dan bukan dari token (kid, jku, x5u), dan bahwa tidak ada jalur kode yang men-decode payload tanpa verifikasi.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate why trusting the token's own alg header breaks verification, using one of the three attacks you just ran."
+      prompt="Jelaskan ke teman satu tim kenapa mempercayai header alg milik token itu sendiri merusak verifikasi, pakai salah satu dari tiga serangan yang barusan kamu jalankan."
       rubric={[
-        "The header is written by whoever builds the token, so it is untrusted",
-        "alg none or HS256 with the public key lets an attacker make a token that passes",
-        "The verifier must pin the algorithm and bind the key to it",
-        "Signature is only the start: exp, iss and aud must be checked too",
+        "Header ditulis oleh siapa pun yang membuat token, jadi nggak dipercaya",
+        "alg none atau HS256 dengan public key membuat attacker bisa membuat token yang lolos",
+        "Verifier harus mem-pin algoritma dan mengikat key ke algoritma itu",
+        "Signature baru permulaan: exp, iss, dan aud juga harus dicek",
       ]}
     />
   </Step>

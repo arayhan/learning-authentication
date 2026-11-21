@@ -89,7 +89,7 @@ const choose = (text: string) => userEvent.click(screen.getByRole("button", { na
 async function answerAll(answers: number[]) {
   for (const [i, a] of answers.entries()) {
     await choose(q1.questions[i].choices[a]);
-    await userEvent.click(screen.getByRole("button", { name: i === answers.length - 1 ? /finish/i : /next/i }));
+    await userEvent.click(screen.getByRole("button", { name: i === answers.length - 1 ? "Selesai" : "Berikutnya" }));
   }
 }
 
@@ -99,7 +99,7 @@ describe("lesson engine", () => {
     renderLesson([]);
     expect(screen.getByText("Hook body")).toBeInTheDocument();
     expect(screen.queryByText("Concept body")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await userEvent.click(screen.getByRole("button", { name: /lanjut/i }));
     expect(await screen.findByText("Concept body")).toBeInTheDocument();
     expect(screen.getByText("Hook body")).toBeInTheDocument();
     expect(server.posts).toEqual([{ kind: "step", ref: "m1-l1/hook" }]);
@@ -109,21 +109,21 @@ describe("lesson engine", () => {
   it("gated quiz blocks Continue until passed", async () => {
     const server = fakeServer(["m1-l1/hook", "m1-l1/concept"]);
     renderLesson(["m1-l1/hook", "m1-l1/concept"]);
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /lanjut/i })).toBeDisabled();
     // a failing attempt keeps it blocked and offers a retry
     await answerAll(q1.questions.map((q) => (q.answer + 1) % q.choices.length));
-    expect(await screen.findByText(new RegExp(`0 of ${q1.questions.length}`))).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(await screen.findByText(new RegExp(`0 dari ${q1.questions.length}`))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /lanjut/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /coba lagi/i }));
     await answerAll(q1.questions.map((q) => q.answer));
-    await waitFor(() => expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: /lanjut/i })).toBeEnabled());
     expect(server.posts.filter((p) => p.kind === "quiz")).toHaveLength(2);
   });
 
   it("an already passed gate does not block Continue", () => {
     fakeServer([]);
     renderLesson(["m1-l1/hook", "m1-l1/concept", "m1-l1/q1"]);
-    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /lanjut/i })).toBeEnabled();
   });
 
   it("completed refs restore: steps 1-2 done → step 3 visible and focused", () => {
@@ -139,13 +139,13 @@ describe("lesson engine", () => {
   it("send returns 'unauthorized' → ReauthDialog opens, revealed steps unchanged, re-sent after re-login", async () => {
     const server = fakeServer([], { unauthorized: true });
     renderLesson([]);
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await userEvent.click(screen.getByRole("button", { name: /lanjut/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.queryByText("Concept body")).not.toBeInTheDocument();
     expect(screen.getByText("Hook body")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
     await userEvent.type(screen.getByLabelText("Password"), "password123");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "Login" }));
     expect(await screen.findByText("Concept body")).toBeInTheDocument();
     expect(server.posts).toEqual([{ kind: "step", ref: "m1-l1/hook" }]);
   });
@@ -155,7 +155,7 @@ describe("reauth recovery", () => {
   const signIn = async () => {
     await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
     await userEvent.type(screen.getByLabelText("Password"), "password123");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "Login" }));
   };
   const dismiss = async () => {
     await screen.findByRole("dialog");
@@ -168,23 +168,23 @@ describe("reauth recovery", () => {
     renderLesson(["m1-l1/hook", "m1-l1/concept"]);
     await answerAll(q1.questions.map((q) => q.answer));
     await dismiss();
-    await userEvent.click(await screen.findByRole("button", { name: /sign in again/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /login lagi/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     await signIn();
-    await waitFor(() => expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: /lanjut/i })).toBeEnabled());
     expect(server.posts).toEqual([{ kind: "quiz", ref: "m1-l1/q1", answers: q1.questions.map((q) => q.answer) }]);
   });
 
   it("BossQuiz: dismissed dialog can be re-opened and the answers are re-sent after login", async () => {
     const server = fakeServer([], { unauthorized: true });
     renderBossStep();
-    await userEvent.click(screen.getByRole("button", { name: /start/i }));
+    await userEvent.click(screen.getByRole("button", { name: /mulai/i }));
     await userEvent.click(screen.getByRole("button", { name: "A" }));
-    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
+    await userEvent.click(screen.getByRole("button", { name: "Selesai" }));
     await dismiss();
-    await userEvent.click(await screen.findByRole("button", { name: /sign in again/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /login lagi/i }));
     await signIn();
-    expect(await screen.findByText("Boss defeated.")).toBeInTheDocument();
+    expect(await screen.findByText("Boss kalah. Mantap!")).toBeInTheDocument();
     expect(server.posts).toHaveLength(1);
     expect(server.posts[0]).toMatchObject({ kind: "boss", ref: "m1-l7/boss", answers: [0] });
   });
@@ -209,11 +209,11 @@ describe("BossQuiz", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99); // identity order
     const server = fakeServer([]);
     renderBossStep();
-    expect(screen.getByRole("button", { name: /finish lesson/i })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: /start/i }));
+    expect(screen.getByRole("button", { name: /selesaikan lesson/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /mulai/i }));
     await userEvent.click(screen.getByRole("button", { name: "A" })); // original index 0 = correct
-    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /finish lesson/i })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Selesai" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /selesaikan lesson/i })).toBeEnabled());
     expect(server.posts[0]).toMatchObject({ kind: "boss", answers: [0] });
   });
 
@@ -232,10 +232,10 @@ describe("BossQuiz", () => {
     expect(getLesson("m1-l7")!.quizzes[0].questions[0].choices).toEqual(["A", "B"]);
     const server = fakeServer([]);
     renderBoss();
-    await userEvent.click(screen.getByRole("button", { name: /start/i }));
+    await userEvent.click(screen.getByRole("button", { name: /mulai/i }));
     expect(screen.getAllByRole("button", { name: /^[AB]$/ }).map((b) => b.textContent)).toEqual(["B", "A"]);
     await userEvent.click(screen.getByRole("button", { name: "B" })); // original index 1
-    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
+    await userEvent.click(screen.getByRole("button", { name: "Selesai" }));
     await waitFor(() => expect(server.posts).toHaveLength(1));
     expect(server.posts[0]).toMatchObject({ kind: "boss", ref: "m1-l7/boss", answers: [1] });
     expect((server.posts[0] as { elapsedMs: number }).elapsedMs).toBeGreaterThanOrEqual(0);
@@ -246,7 +246,7 @@ describe("BossQuiz", () => {
     try {
       const server = fakeServer([]);
       renderBoss();
-      fireEvent.click(screen.getByRole("button", { name: /start/i }));
+      fireEvent.click(screen.getByRole("button", { name: /mulai/i }));
       await vi.advanceTimersByTimeAsync(600_000 + 500);
       expect(server.posts).toHaveLength(1);
       expect(server.posts[0]).toMatchObject({ kind: "boss", answers: [-1] });

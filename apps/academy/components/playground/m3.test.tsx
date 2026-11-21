@@ -101,7 +101,7 @@ describe("PkceGenerator", () => {
     const { calls } = fakeFetch(() => json(400, { error: "invalid_grant" }));
     wrap(<PkceGenerator />);
     fireEvent.change(screen.getByLabelText("Code verifier"), { target: { value: RFC_VERIFIER } });
-    await userEvent.click(screen.getByRole("button", { name: /test a wrong verifier/i }));
+    await userEvent.click(screen.getByRole("button", { name: /tes verifier yang salah/i }));
     expect(await screen.findByText("invalid_grant")).toBeInTheDocument();
     const c = calls[0];
     expect(c.url).toBe("http://localhost:4103/token");
@@ -119,7 +119,7 @@ describe("PkceGenerator", () => {
     const { calls } = fakeFetch(() => json(400, { error: "invalid_grant" }));
     wrap(<PkceGenerator />);
     fireEvent.change(screen.getByLabelText(/authorization code/i), { target: { value: " real-code " } });
-    await userEvent.click(screen.getByRole("button", { name: /test a wrong verifier/i }));
+    await userEvent.click(screen.getByRole("button", { name: /tes verifier yang salah/i }));
     await screen.findByText("invalid_grant");
     expect(new URLSearchParams(calls[0].init.body as string).get("code")).toBe("real-code");
   });
@@ -129,14 +129,14 @@ describe("PkceGenerator", () => {
       throw new TypeError("Failed to fetch");
     });
     wrap(<PkceGenerator />);
-    await userEvent.click(screen.getByRole("button", { name: /test a wrong verifier/i }));
-    expect(await screen.findByText("Lab 03 (Go) is not running")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /tes verifier yang salah/i }));
+    expect(await screen.findByText("Lab 03 (Go) belum jalan")).toBeInTheDocument();
     expect(screen.getByText("pnpm lab 03 --go")).toBeInTheDocument();
   });
 });
 
 describe("OAuthUrlBuilder", () => {
-  const url = () => screen.getByLabelText("Authorize URL").textContent!;
+  const url = () => screen.getByLabelText("URL authorize").textContent!;
 
   it("encodes scope spaces as %20, encodes the redirect_uri and sends code_challenge_method=S256", () => {
     wrap(<OAuthUrlBuilder />);
@@ -153,7 +153,7 @@ describe("OAuthUrlBuilder", () => {
 
   it("vulnerable mode adds lab_mode=vulnerable, and an empty challenge sends no PKCE parameters", () => {
     wrap(<OAuthUrlBuilder />);
-    fireEvent.click(screen.getByLabelText(/vulnerable mode/i));
+    fireEvent.click(screen.getByLabelText(/mode vulnerable/i));
     fireEvent.change(screen.getByLabelText("code_challenge"), { target: { value: "" } });
     expect(url()).toContain("lab_mode=vulnerable");
     expect(url()).not.toContain("code_challenge");
@@ -165,7 +165,7 @@ describe("OAuthUrlBuilder", () => {
     wrap(<OAuthUrlBuilder />);
     expect(url()).toMatch(/^http:\/\/localhost:4203\/authorize\?/);
     expect(url()).toContain("redirect_uri=http%3A%2F%2Flocalhost%3A4213%2Fcallback");
-    await userEvent.click(screen.getByRole("button", { name: /^open/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^buka/i }));
     expect(open).toHaveBeenCalledWith(url(), "_blank", "noopener,noreferrer");
   });
 
@@ -174,7 +174,7 @@ describe("OAuthUrlBuilder", () => {
       if (opts.offline) throw new TypeError("Failed to fetch");
       return new Response("<html></html>", { status: u.includes("lab_mode=vulnerable") ? (opts.vulnerable ?? 200) : (opts.secure ?? 400) });
     };
-    const run = () => userEvent.click(screen.getByRole("button", { name: /run redirect attack/i }));
+    const run = () => userEvent.click(screen.getByRole("button", { name: /jalankan attack redirect/i }));
 
     it("sends m3-l5/redirect-prefix once, after secure 400 and vulnerable 200 for a callback.evil redirect", async () => {
       const { posts, calls } = fakeFetch(labFor());
@@ -200,14 +200,14 @@ describe("OAuthUrlBuilder", () => {
 
     it("does not render the attack panel without the attack prop", () => {
       wrap(<OAuthUrlBuilder />);
-      expect(screen.queryByRole("button", { name: /run redirect attack/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /jalankan attack redirect/i })).not.toBeInTheDocument();
     });
 
     it("degrades to the offline card when the lab is down", async () => {
       const { posts } = fakeFetch(labFor({ offline: true }));
       wrap(<OAuthUrlBuilder attack />);
       await run();
-      expect(await screen.findByText("Lab 03 (Go) is not running")).toBeInTheDocument();
+      expect(await screen.findByText("Lab 03 (Go) belum jalan")).toBeInTheDocument();
       expect(posts).toEqual([]);
     });
   });
@@ -241,8 +241,8 @@ describe("InterceptionAttack", () => {
     fakeFetch(lab());
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     wrap(<InterceptionAttack />);
-    await userEvent.click(screen.getByRole("button", { name: /open the authorize page without pkce/i }));
-    await userEvent.click(screen.getByRole("button", { name: /open the authorize page with pkce/i }));
+    await userEvent.click(screen.getByRole("button", { name: /buka halaman authorize tanpa pkce/i }));
+    await userEvent.click(screen.getByRole("button", { name: /buka halaman authorize dengan pkce/i }));
     const [v, s] = open.mock.calls.map((c) => c[0] as string);
     expect(v).toContain("lab_mode=vulnerable");
     expect(v).toContain("state=m3-l4-vulnerable");
@@ -255,19 +255,19 @@ describe("InterceptionAttack", () => {
   it("sends m3-l4/code-interception only after the vulnerable code works AND the PKCE code fails", async () => {
     const { posts, calls } = fakeFetch(lab());
     wrap(<InterceptionAttack />);
-    expect(screen.getByRole("button", { name: /replay the code without pkce/i })).toBeDisabled(); // no code seen yet
+    expect(screen.getByRole("button", { name: /replay code tanpa pkce/i })).toBeDisabled(); // no code seen yet
     emit(consent("e1", "m3-l4-vulnerable", "CODE-V"), consent("e2", "m3-l4-secure", "CODE-S"));
 
-    await replay(/replay the code without pkce/i);
+    await replay(/replay code tanpa pkce/i);
     expect(await screen.findByText("200")).toBeInTheDocument();
     await settle();
     expect(posts).toEqual([]); // one outcome is not enough
 
-    await replay(/replay the code with pkce/i);
+    await replay(/replay code dengan pkce/i);
     expect(await screen.findByText("400")).toBeInTheDocument();
     await waitFor(() => expect(posts).toEqual([{ kind: "attack", ref: "m3-l4/code-interception" }]));
 
-    await replay(/replay the code with pkce/i);
+    await replay(/replay code dengan pkce/i);
     await settle();
     expect(posts).toHaveLength(1);
 
@@ -281,11 +281,11 @@ describe("InterceptionAttack", () => {
     const { posts } = fakeFetch(lab());
     wrap(<InterceptionAttack />);
     emit(consent("e1", "m3-l4-secure", "CODE-S"), consent("e2", "m3-l4-vulnerable", "CODE-V"));
-    await replay(/replay the code with pkce/i);
+    await replay(/replay code dengan pkce/i);
     await screen.findByText("400");
     await settle();
     expect(posts).toEqual([]);
-    await replay(/replay the code without pkce/i);
+    await replay(/replay code tanpa pkce/i);
     await waitFor(() => expect(posts).toHaveLength(1));
   });
 
@@ -293,8 +293,8 @@ describe("InterceptionAttack", () => {
     const { posts } = fakeFetch(lab({ secure: 200 }));
     wrap(<InterceptionAttack />);
     emit(consent("e1", "m3-l4-vulnerable", "CODE-V"), consent("e2", "m3-l4-secure", "CODE-S"));
-    await replay(/replay the code without pkce/i);
-    await replay(/replay the code with pkce/i);
+    await replay(/replay code tanpa pkce/i);
+    await replay(/replay code dengan pkce/i);
     expect(await screen.findAllByText("200")).toHaveLength(2);
     await settle();
     expect(posts).toEqual([]);
@@ -306,7 +306,7 @@ describe("InterceptionAttack", () => {
     const denied = consent("e3", "m3-l4-vulnerable", "x");
     denied.res.headers = { location: "http://localhost:4113/callback?error=access_denied&state=m3-l4-vulnerable" };
     emit(consent("e1", "some-other-flow", "CODE-X"), denied, { ...consent("e2", "m3-l4-vulnerable", "CODE-V"), res: { status: 200, headers: {} } });
-    expect(screen.getByRole("button", { name: /replay the code without pkce/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /replay code tanpa pkce/i })).toBeDisabled();
   });
 
   it("degrades to the offline card when the lab is down", async () => {
@@ -315,8 +315,8 @@ describe("InterceptionAttack", () => {
     });
     wrap(<InterceptionAttack />);
     emit(consent("e1", "m3-l4-vulnerable", "CODE-V"));
-    await replay(/replay the code without pkce/i);
-    expect(await screen.findAllByText("Lab 03 (Go) is not running")).not.toHaveLength(0);
+    await replay(/replay code tanpa pkce/i);
+    expect(await screen.findAllByText("Lab 03 (Go) belum jalan")).not.toHaveLength(0);
     expect(posts).toEqual([]);
   });
 });

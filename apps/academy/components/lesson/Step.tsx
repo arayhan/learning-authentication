@@ -36,7 +36,7 @@ export function Step({ id, title, children }: { id: string; title: string; child
   return (
     <section aria-labelledby={`step-${id}`} className="space-y-4 border-t py-8 first:border-t-0 first:pt-0">
       <h2 id={`step-${id}`} tabIndex={-1} className="flex scroll-mt-20 items-center gap-2 text-xl font-semibold tracking-tight outline-none">
-        {info.done && <Check aria-label="Completed" className="size-5 text-brand" />}
+        {info.done && <Check aria-label="Selesai" className="size-5 text-brand" />}
         {title}
       </h2>
       <GateCtx.Provider value={registerGate}>
@@ -45,16 +45,16 @@ export function Step({ id, title, children }: { id: string; title: string; child
       {!info.done && (
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Button onClick={cont} disabled={blocked || busy}>
-            {info.last ? "Finish lesson" : "Continue"}
+            {info.last ? "Selesaikan lesson" : "Lanjut"}
           </Button>
-          {blocked && <p className="text-sm text-muted-foreground">Pass the quiz to continue.</p>}
+          {blocked && <p className="text-sm text-muted-foreground">Lulusin quiz dulu biar bisa lanjut.</p>}
           {awaitingLogin && (
             <>
-              <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
-              <Button variant="outline" onClick={openReauth}>Sign in again</Button>
+              <p role="status" className="text-sm text-muted-foreground">Login lagi buat nyimpen progress kamu.</p>
+              <Button variant="outline" onClick={openReauth}>Login lagi</Button>
             </>
           )}
-          {failed && <p role="alert" className="text-sm text-destructive">Could not save your progress. Try again.</p>}
+          {failed && <p role="alert" className="text-sm text-destructive">Progress gagal disimpan. Coba lagi.</p>}
         </div>
       )}
     </section>

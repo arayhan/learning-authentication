@@ -2,70 +2,70 @@ import { flows } from "@/content/flows";
 
 <LessonSteps>
   <Step id="hook" title="Hook">
-    HTTP has no memory. Every request arrives as a stranger, yet the app somehow remembers you across a hundred page loads without asking for your password again.
+    HTTP itu nggak punya ingatan. Setiap request datang seperti orang asing, tapi entah gimana app tetap ingat kamu sepanjang seratus kali load halaman tanpa minta password lagi.
 
-    <Analogy title="The coat-check ticket">
-      You hand over your coat once and get a numbered ticket. Showing the ticket gets the coat back, and nobody asks who you are again. But anyone holding the ticket gets the coat, so the number must be impossible to guess.
+    <Analogy title="Tiket penitipan tas">
+      Kamu titip tas sekali dan dapat tiket bernomor. Tunjukkan tiketnya, tas kembali, dan nggak ada yang tanya kamu siapa lagi. Tapi siapa pun yang pegang tiket itu bisa ambil tasnya, jadi nomornya harus mustahil ditebak.
     </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    After a successful login the server creates a **session**: a record that says "this is Alice, valid until 15:30". It gives the browser a random **session id** to point at that record, and the browser sends the id back on every request.
+  <Step id="concept" title="Konsep">
+    Setelah login berhasil, server membuat **session**: catatan yang bilang "ini Alice, berlaku sampai 15:30". Server memberi browser sebuah **session id** acak yang menunjuk ke catatan itu, dan browser mengirim id itu kembali di setiap request.
 
-    The id travels in a **cookie**. The server sets it once with `Set-Cookie`, and from then on the browser attaches it automatically to every request to that site.
+    Id itu dibawa di **cookie**. Server mengaturnya sekali lewat `Set-Cookie`, dan sejak itu browser menempelkannya otomatis ke setiap request ke situs tersebut.
 
     <SequenceFlow flow={flows.sessionCookie} />
 
-    The session id is a **bearer secret**: whoever presents it is treated as Alice. That one fact drives every rule in this lesson. It must be random, protected in storage, protected in transit, and hidden from scripts.
+    Session id adalah **bearer secret**: siapa pun yang menunjukkannya dianggap Alice. Satu fakta ini menjadi dasar semua aturan di pelajaran ini. Id harus acak, aman di penyimpanan, aman saat dikirim, dan tersembunyi dari script.
   </Step>
 
-  <Step id="cookie" title="Anatomy of a cookie">
-    This is the exact header the lab sends back from `/login`:
+  <Step id="cookie" title="Anatomi cookie">
+    Ini header persis yang dikirim lab dari `/login`:
 
     ```text
     Set-Cookie: sid=Xk3q9ZmB1vW8eYrT5uLpA7sD0fGhJcN4iOaE6bQwVyU; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax
     ```
 
-    Each attribute is a safety feature:
+    Setiap atribut adalah fitur keamanan:
 
-    | Attribute | What it does | Why you want it |
+    | Atribut | Fungsinya | Kenapa kamu butuh |
     |---|---|---|
-    | `HttpOnly` | Hides the cookie from `document.cookie` | An injected script cannot read and ship off the session id |
-    | `Secure` | Sends the cookie over HTTPS only | Stops it travelling in clear text on a network you do not control |
-    | `SameSite=Lax` | Withholds the cookie on cross-site subrequests and POSTs | Cuts off most CSRF (lesson 5) |
-    | `Path=/` | Which URLs get the cookie | Keep it broad for a session |
-    | `Max-Age=3600` | Lifetime in seconds | A cookie that expires, and a session that expires with it |
-    | no `Domain` | A host-only cookie | Subdomains do not receive it |
+    | `HttpOnly` | Menyembunyikan cookie dari `document.cookie` | Script yang disusupkan tidak bisa membaca dan mengirim keluar session id |
+    | `Secure` | Mengirim cookie lewat HTTPS saja | Mencegahnya lewat sebagai teks biasa di jaringan yang tidak kamu kontrol |
+    | `SameSite=Lax` | Menahan cookie di subrequest dan POST lintas situs | Memutus sebagian besar CSRF (pelajaran 5) |
+    | `Path=/` | URL mana yang menerima cookie | Biarkan luas untuk session |
+    | `Max-Age=3600` | Masa hidup dalam detik | Cookie yang kedaluwarsa, dan session yang ikut kedaluwarsa |
+    | tanpa `Domain` | Cookie host-only | Subdomain tidak menerimanya |
 
     <Callout type="warn">
-      The lab leaves out `Secure` only because it runs on plain `http://localhost`. In production `Secure` is required. The strongest form is the `__Host-` prefix, for example `__Host-sid`: the browser then insists on `Secure`, `Path=/` and no `Domain`.
+      Lab ini tidak memakai `Secure` cuma karena jalan di `http://localhost` biasa. Di production `Secure` wajib. Bentuk paling kuat adalah prefix `__Host-`, misalnya `__Host-sid`: browser lalu memaksa `Secure`, `Path=/`, dan tanpa `Domain`.
     </Callout>
 
-    A word on **same-site** versus **same-origin**, because it trips people up. A *site* is the scheme plus the registrable domain, and ports are ignored. So `localhost:3000` (this academy) and `localhost:4101` (the lab) are **same-site**, which is why the lab's cookie flows to and from your browser even though the ports differ.
+    Sedikit soal **same-site** versus **same-origin**, karena ini sering bikin bingung. *Site* adalah scheme plus domain terdaftar, dan port diabaikan. Jadi `localhost:3000` (academy ini) dan `localhost:4101` (lab) itu **same-site**, makanya cookie lab bisa mengalir bolak-balik ke browser kamu walau port-nya beda.
   </Step>
 
-  <Step id="server" title="What the server keeps">
-    A good session store follows three rules.
+  <Step id="server" title="Apa yang disimpan server">
+    Session store yang bagus mengikuti tiga aturan.
 
-    1. **Random id.** 32 bytes from a cryptographically secure generator, base64url-encoded. OWASP asks for at least 64 bits of entropy, and 256 bits makes guessing hopeless. The id has no meaning: it is a lookup key, not a data container.
-    2. **Store only the hash.** The `sessions` table holds `sha256(id)`, never the id. If the table leaks, the attacker cannot turn rows into cookies.
-    3. **Check the expiry on every lookup.** `expires_at > now()` is part of the query, so an expired session simply does not exist.
+    1. **Id acak.** 32 byte dari generator acak yang aman secara kriptografi, di-encode base64url. OWASP meminta minimal 64 bit entropy, dan 256 bit bikin menebak jadi mustahil. Id tidak punya makna: ia hanya kunci pencarian, bukan wadah data.
+    2. **Simpan hash-nya saja.** Tabel `sessions` menyimpan `sha256(id)`, bukan id-nya. Kalau tabel bocor, attacker tidak bisa mengubah baris jadi cookie.
+    3. **Cek expiry di setiap lookup.** `expires_at > now()` adalah bagian dari query, jadi session yang kedaluwarsa dianggap tidak ada.
 
-    A plain SHA-256 is correct here, unlike for passwords. The token is 256 random bits, so there is nothing to guess and no point in a slow hash.
+    SHA-256 biasa itu benar di sini, tidak seperti untuk password. Token-nya 256 bit acak, jadi tidak ada yang bisa ditebak dan tidak perlu hash yang lambat.
 
     <Callout type="security">
-      HttpOnly stops a script from **reading** the cookie. It does not stop an XSS bug from **using** it by sending requests from inside the victim's page. HttpOnly limits the damage, it does not cure the bug.
+      HttpOnly mencegah script **membaca** cookie. Ia tidak mencegah bug XSS **memakainya** dengan mengirim request dari dalam halaman korban. HttpOnly membatasi kerusakan, bukan menyembuhkan bug-nya.
     </Callout>
   </Step>
 
-  <Step id="check" title="Check">
-    Three questions. Every answer has to be right, but you can try as often as you like.
+  <Step id="check" title="Cek">
+    Tiga pertanyaan. Semua jawaban harus benar, tapi kamu boleh coba lagi sesering yang kamu mau.
 
     <Quiz id="q1" gate />
   </Step>
 
   <Step id="lab" title="Lab">
-    Time to watch a session cookie get born. Log in, find the cookie in the Inspector, then use it.
+    Saatnya melihat cookie session dilahirkan. Log in, cari cookie-nya di Inspector, lalu pakai.
 
     <LabTasks />
 
@@ -78,105 +78,105 @@ import { flows } from "@/content/flows";
       ]}
     />
 
-    Click the `POST /login` row in the Inspector and open the **Cookies** tab: you should see `sid` with `HttpOnly` and `SameSite=Lax`. The response body also contains a `csrfToken`. Lesson 5 puts it to work.
+    Klik baris `POST /login` di Inspector dan buka tab **Cookies**: kamu akan melihat `sid` dengan `HttpOnly` dan `SameSite=Lax`. Response body juga berisi `csrfToken`. Token itu dipakai di pelajaran 5.
 
-    Then click **Whoami**. You never sent a password or a header: the browser attached the cookie on its own, and `GET /me` came back `200`.
+    Lalu klik **Whoami**. Kamu tidak pernah mengirim password atau header: browser menempelkan cookie sendiri, dan `GET /me` kembali `200`.
 
     <Shot
       src="/shots/lab01-login.png"
-      alt="The Lab 01 page after a successful login: a card with email and password fields, four buttons, and a response panel reading POST /login 200 with a csrfToken."
-      caption="Lab 01 after Log in. The body carries a csrfToken, but no session id."
-      callouts={[{ x: 50, y: 79, label: "The response body holds only the csrfToken. The session id is not in it: it travels in the Set-Cookie header." }]}
+      alt="Halaman Lab 01 setelah login berhasil: kartu dengan kolom email dan password, empat tombol, dan panel response bertuliskan POST /login 200 dengan csrfToken."
+      caption="Lab 01 setelah Log in. Body membawa csrfToken, tapi tanpa session id."
+      callouts={[{ x: 50, y: 79, label: "Response body hanya berisi csrfToken. Session id tidak ada di sana: ia lewat di header Set-Cookie." }]}
     />
 
     <Shot
       src="/shots/lab01-devtools-cookie.png"
-      alt="Two panels. The console shows document.cookie returning an empty string. The cookie list below shows a cookie named sid with HttpOnly ticked, SameSite Lax and Path /."
-      caption="The same login seen from two sides. JavaScript gets an empty string, the browser's cookie store has the sid."
+      alt="Dua panel. Console menunjukkan document.cookie mengembalikan string kosong. Daftar cookie di bawahnya menunjukkan cookie bernama sid dengan HttpOnly tercentang, SameSite Lax, dan Path /."
+      caption="Login yang sama dilihat dari dua sisi. JavaScript dapat string kosong, cookie store browser memegang sid."
       callouts={[
-        { x: 7, y: 16, label: "document.cookie is empty: HttpOnly hides sid from any script on the page, including an injected one." },
-        { x: 24, y: 36, label: "The browser still holds sid, flagged HttpOnly with SameSite=Lax, and sends it on every request to the lab." },
+        { x: 7, y: 16, label: "document.cookie kosong: HttpOnly menyembunyikan sid dari semua script di halaman, termasuk yang disusupkan." },
+        { x: 24, y: 36, label: "Browser tetap memegang sid, bertanda HttpOnly dengan SameSite=Lax, dan mengirimnya di setiap request ke lab." },
       ]}
     />
 
     <Callout type="info">
-      Cookies ignore ports. Switch the selector to TS and click Whoami again. The Go and TS labs share one database, so the session you created in one is valid in the other. It is also a handy proof that the session lives in the database, not in the process.
+      Cookie mengabaikan port. Ganti selector ke TS dan klik Whoami lagi. Lab Go dan TS berbagi satu database, jadi session yang kamu buat di satu implementasi valid di yang lain. Ini juga bukti praktis bahwa session hidup di database, bukan di proses.
     </Callout>
   </Step>
 
-  <Step id="code" title="Code">
-    Generating the token, hashing it for storage and building the cookie. Notice how little there is to it.
+  <Step id="code" title="Kode">
+    Membuat token, meng-hash-nya untuk disimpan, dan membangun cookie. Perhatikan betapa sedikit kodenya.
 
     <CodeTabs
       go="labs/01-sessions/go/session.go#L18-L37"
       ts="labs/01-sessions/ts/src/session.ts#L5-L13"
       notes={{
-        24: "32 random bytes, base64url without padding.",
-        29: "Only the sha256 of the token is ever stored.",
-        36: "HttpOnly and SameSite=Lax, one hour. No Secure here only because the lab runs on http://localhost.",
-        6: "randomBytes(32).toString(\"base64url\"): the same recipe in TypeScript.",
-        13: "Same cookie attributes as the Go lab, byte for byte.",
+        24: "32 byte acak, base64url tanpa padding.",
+        29: "Hanya sha256 dari token yang pernah disimpan.",
+        36: "HttpOnly dan SameSite=Lax, satu jam. Tanpa Secure di sini cuma karena lab jalan di http://localhost.",
+        6: "randomBytes(32).toString(\"base64url\"): resep yang sama di TypeScript.",
+        13: "Atribut cookie yang sama dengan lab Go, byte demi byte.",
       }}
     />
 
-    Writing and reading the session row. The insert uses the hash, and the lookup checks the expiry in SQL.
+    Menulis dan membaca baris session. Insert memakai hash, dan lookup mengecek expiry di SQL.
 
     <CodeTabs
       go="labs/01-sessions/go/session.go#L47-L67"
       ts="labs/01-sessions/ts/src/store.ts#L68-L81"
       notes={{
-        53: "hashToken(token): the raw id never reaches the database.",
-        62: "Hash the cookie, match the row, and require expires_at > now().",
-        71: "The same insert in TypeScript, keyed by the hash.",
-        79: "Same lookup: hashed id and an unexpired row.",
+        53: "hashToken(token): id mentah tidak pernah sampai ke database.",
+        62: "Hash cookie-nya, cocokkan barisnya, dan wajibkan expires_at > now().",
+        71: "Insert yang sama di TypeScript, dikunci pakai hash.",
+        79: "Lookup yang sama: id yang di-hash dan baris yang belum kedaluwarsa.",
       }}
     />
 
-    And the handler that uses it. Every protected route starts like this: find the live session, or answer 401.
+    Dan handler yang memakainya. Setiap route yang dilindungi dimulai begini: cari session yang masih hidup, atau balas 401.
 
     <CodeTabs go="labs/01-sessions/go/server.go#L231-L252" ts="labs/01-sessions/ts/src/app.ts#L145-L154" />
 
     <Callout type="info">
-      A browser-facing SSO typically follows the same pattern: a first-party session cookie on the SSO host, backed by a server-side record. Worth checking: how does your **sso-backend** name and flag its session cookie, and how does that compare to the table above?
+      SSO yang dipakai lewat browser biasanya mengikuti pola yang sama: cookie session first-party di host SSO, didukung catatan di sisi server. Coba cek: gimana **sso-backend** kamu menamai dan memberi flag cookie session-nya, dan gimana bedanya dengan tabel di atas?
     </Callout>
   </Step>
 
-  <Step id="recap" title="Recap">
+  <Step id="recap" title="Rangkuman">
     <RecapCard
       bullets={[
-        "A session is a server-side record. The cookie carries only a random id that points to it.",
-        "The id is a bearer secret: 32 random bytes, no meaning, never guessable.",
-        "Cookie flags: HttpOnly, Secure (always in production), SameSite=Lax, a bounded lifetime.",
-        "Store sha256(id), not the id, so a database leak is not a session leak.",
-        "HttpOnly stops theft of the cookie, not abuse through an XSS bug.",
+        "Session adalah catatan di sisi server. Cookie hanya membawa id acak yang menunjuk ke sana.",
+        "Id adalah bearer secret: 32 byte acak, tanpa makna, tidak bisa ditebak.",
+        "Flag cookie: HttpOnly, Secure (selalu di production), SameSite=Lax, masa hidup terbatas.",
+        "Simpan sha256(id), bukan id-nya, supaya kebocoran database bukan kebocoran session.",
+        "HttpOnly mencegah pencurian cookie, bukan penyalahgunaan lewat bug XSS.",
       ]}
       interview={[
         {
-          q: "Why do we need sessions at all?",
-          a: "HTTP is stateless. After one authentication the server issues a random id, remembers who it belongs to, and the browser sends it back automatically so the user does not log in on every request.",
+          q: "Kenapa kita butuh session?",
+          a: "HTTP itu stateless. Setelah satu kali authentication, server menerbitkan id acak, mencatat milik siapa id itu, dan browser mengirimnya kembali otomatis sehingga user tidak perlu login di setiap request.",
         },
         {
-          q: "What do HttpOnly, Secure and SameSite each protect against?",
-          a: "HttpOnly keeps the cookie away from JavaScript, so an XSS bug cannot read it. Secure keeps it off plain HTTP. SameSite limits when it is sent on cross-site requests, which reduces CSRF.",
+          q: "HttpOnly, Secure, dan SameSite masing-masing melindungi dari apa?",
+          a: "HttpOnly menjauhkan cookie dari JavaScript, jadi bug XSS tidak bisa membacanya. Secure menjauhkannya dari HTTP biasa. SameSite membatasi kapan cookie dikirim di request lintas situs, sehingga mengurangi CSRF.",
         },
         {
-          q: "Why hash session ids in the database?",
-          a: "The id is equivalent to a password for that session. Storing only its hash means a leaked database or backup cannot be replayed as cookies. A plain SHA-256 is enough because the token is 256 random bits.",
+          q: "Kenapa session id di-hash di database?",
+          a: "Id setara dengan password untuk session itu. Menyimpan hash-nya saja berarti database atau backup yang bocor tidak bisa dipakai ulang sebagai cookie. SHA-256 biasa sudah cukup karena token-nya 256 bit acak.",
         },
         {
-          q: "Session cookie or token in localStorage?",
-          a: "A cookie can be HttpOnly, so XSS cannot read it, but it needs CSRF protection because the browser sends it automatically. localStorage is readable by any script on the page and needs no CSRF protection, so it trades one risk for the other. Module 2 digs into this.",
+          q: "Cookie session atau token di localStorage?",
+          a: "Cookie bisa HttpOnly sehingga XSS tidak bisa membacanya, tapi butuh perlindungan CSRF karena browser mengirimnya otomatis. localStorage bisa dibaca script mana pun di halaman dan tidak butuh perlindungan CSRF, jadi ini menukar satu risiko dengan risiko lain. Module 2 membahas ini lebih dalam.",
         },
       ]}
     />
 
     <ExplainBack
-      prompt="Explain to a teammate what exactly is stored in the cookie, what is stored in the database, and why they differ."
+      prompt="Jelaskan ke teman satu tim apa persisnya yang disimpan di cookie, apa yang disimpan di database, dan kenapa keduanya berbeda."
       rubric={[
-        "The cookie holds a random session id and nothing else",
-        "The database holds sha256 of the id, the user and the expiry",
-        "The hash means a database leak cannot be replayed as cookies",
-        "The cookie is a bearer secret, so flags protect it",
+        "Cookie hanya berisi session id acak, tidak ada yang lain",
+        "Database menyimpan sha256 dari id, user, dan expiry",
+        "Hash membuat kebocoran database tidak bisa dipakai ulang sebagai cookie",
+        "Cookie adalah bearer secret, jadi flag-nya yang melindunginya",
       ]}
     />
   </Step>
