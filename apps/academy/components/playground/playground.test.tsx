@@ -350,6 +350,34 @@ describe("LabConsole", () => {
     expect(init.body).toBe('{"to":"bob","note":"tok-123"}');
   });
 
+  it("replaces {{accessToken}} with the access_token of the latest JSON response, per implementation", async () => {
+    const f = vi.fn(async (url: string) =>
+      url.endsWith("/login")
+        ? new Response('{"access_token":"jwt-abc","token_type":"Bearer","expires_in":300}', { status: 200, headers: { "content-type": "application/json" } })
+        : new Response('{"ok":true}', { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", f);
+    wrap(
+      <LabConsole
+        lab="02"
+        actions={[
+          { label: "Login", method: "POST", path: "/login", body: { email: "a" } },
+          { label: "Profile", method: "GET", path: "/api/profile", headers: { Authorization: "Bearer {{accessToken}}" } },
+        ]}
+      />,
+    );
+    const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
+    expect(screen.getByText("Log in first")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Profile/ }));
+    expect(labCalls()[0][1].headers).toMatchObject({ Authorization: "Bearer " });
+    await userEvent.click(screen.getByRole("button", { name: /Login/ }));
+    await screen.findByText(/jwt-abc/);
+    expect(screen.queryByText("Log in first")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Profile/ })); // a response without access_token keeps it
+    await userEvent.click(screen.getByRole("button", { name: /Profile/ }));
+    expect(labCalls()[3][1].headers).toMatchObject({ Authorization: "Bearer jwt-abc" });
+  });
+
   it("{{randomEmail}} makes a fresh learner address per send and {{email}} reuses the last one", async () => {
     vi.stubGlobal("crypto", webcrypto);
     const f = vi.fn(async () => new Response('{"ok":true}', { status: 200, headers: { "content-type": "application/json" } }));

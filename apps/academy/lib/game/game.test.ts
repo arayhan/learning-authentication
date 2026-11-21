@@ -106,8 +106,13 @@ describe("evaluateBadges", () => {
     expect(evaluateBadges({ completed: new Set(), perfectBoss: true, streak: 7 })).toEqual(["on-call", "flawless"]);
     expect(evaluateBadges({ completed: new Set(), perfectBoss: false, streak: 6 })).toEqual([]);
   });
-  it("red-team needs at least one attack and all done", () => {
-    // stubs have no attacks yet; real attack refs land with the content tasks
+  it("red-team needs every attack in the course, not just module 1's", () => {
+    const attackRefs = (mods: typeof course) => mods.flatMap((m) => m.lessons.flatMap((l) => l.attacks.map((a) => `${l.id}/${a.id}`)));
+    const all = attackRefs(course);
+    expect(all.length).toBeGreaterThan(attackRefs([m1]).length); // module 2 contributes attacks
     expect(evaluateBadges({ completed: new Set(), perfectBoss: false, streak: 0 })).not.toContain("red-team");
+    expect(evaluateBadges({ completed: refs(m1), perfectBoss: false, streak: 0 })).not.toContain("red-team"); // M1 alone is not enough
+    expect(evaluateBadges({ completed: new Set(all.slice(1)), perfectBoss: false, streak: 0 })).not.toContain("red-team");
+    expect(evaluateBadges({ completed: new Set(all), perfectBoss: false, streak: 0 })).toContain("red-team");
   });
 });

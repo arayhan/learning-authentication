@@ -1,17 +1,155 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    You have two tokens now, and the browser gives you exactly four places to put them: `localStorage`, `sessionStorage`, a variable in memory, or a cookie. Every tutorial picks one, and most do not say what it costs.
+
+    The honest answer depends on one question: what can the attacker do when a script they wrote runs inside your page? That attack is **XSS (cross-site scripting)**, and it is the reason this lesson exists.
+
+    <Analogy title="The wallet and the taped note">
+      A wallet in your pocket needs someone to reach into your pocket. A note with your PIN taped to the front door can be read by everyone who walks by. Where you keep a secret decides who can get at it.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    Any JavaScript that runs on your page runs with **all** of your page's privileges. It can read `localStorage`, call your API, and send data to any server. It does not matter how the script got there: a comment field that did not escape HTML, a compromised npm dependency, a third-party ad.
+
+    <SequenceFlow flow={flows.xssTheft} />
+
+    Two things follow, and they pull in opposite directions.
+
+    1. A token that JavaScript **can read** can be stolen and replayed from the attacker's own machine, at leisure, until it expires.
+    2. A token the browser attaches **by itself** (a cookie) is exposed to forged requests from other sites. That is CSRF, from Module 1.
+
+    So there is no storage that is safe against everything. The goal is to choose which risk you take for each token, and to keep the stolen-token window small.
+  </Step>
+
+  <Step id="options" title="The options">
+    | Where | Readable by an XSS script? | Sent automatically (CSRF)? | Survives a reload? | Verdict |
+    |---|---|---|---|---|
+    | `localStorage` | **Yes** | No | Yes, in every tab | Avoid for tokens |
+    | `sessionStorage` | **Yes** | No | Only in that tab | Avoid for tokens |
+    | In-memory variable | Not directly | No | No: gone on reload | Good for the **access** token |
+    | `HttpOnly` cookie | **No** | **Yes** | Yes | Good for the **refresh** token, with `SameSite` and a narrow `Path` |
+
+    That gives the pattern Lab 02 uses:
+
+    - The **access token** lives only in a JavaScript variable inside your app's own code. It is never written to storage, so there is nothing for a script to read from storage, and it is short-lived anyway.
+    - The **refresh token** lives in an `HttpOnly; SameSite=Strict` cookie scoped to `Path=/refresh`. JavaScript cannot read it. The browser sends it only to the refresh endpoint.
+    - On page load there is no access token in memory yet. The app calls `POST /refresh`, the cookie rides along, and a new access token comes back. A reload costs one request, not a login.
+
+    ```js
+    let accessToken = null; // module scope: not on window, not in storage
+
+    async function refresh() {
+      const res = await fetch("/refresh", { method: "POST", credentials: "include" });
+      if (!res.ok) return signOut();
+      accessToken = (await res.json()).access_token;
+    }
+
+    async function api(path) {
+      const call = () => fetch(path, { headers: { Authorization: `Bearer ${accessToken}` } });
+      let res = await call();
+      if (res.status === 401) { await refresh(); res = await call(); }
+      return res;
+    }
+    ```
+
+    <Callout type="warn">
+      **XSS can still use the session while the page is open.** The injected script can call your API, and it can call `POST /refresh`: the browser attaches the HttpOnly cookie for it and the script receives a fresh access token. What it cannot do is carry the refresh token away. So the damage ends when the tab closes or you revoke the session, instead of lasting 14 days.
+    </Callout>
+
+    A cookie-carried refresh token raises the CSRF question again. The lab answers it with `SameSite=Strict` and `Path=/refresh`, and a production setup should also check the `Origin` header on `/refresh`. A forged request cannot read the response, so the worst it could do is trigger a rotation.
+
+    <Callout type="info">
+      The strongest option is not to put tokens in the browser at all. In a **backend-for-frontend (BFF)** design the browser only has an ordinary HttpOnly session cookie, and a server of yours holds the tokens and calls the APIs. It is more moving parts, but nothing stealable is left in the page. Module 3 returns to this for OAuth.
+    </Callout>
+
+    <Callout type="info">
+      Worth asking of your own setup: where does the **sso-frontend** keep the token it gets from **sso-backend**? Storage, memory or a cookie, and which row of the table above is that?
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="simulate" title="Simulator">
+    Play the attacker. An injected script tries all five places at once. Run it, see which ones leak, and then ask what the script can still do.
+
+    1. Click **Run XSS script** and read the **Result** column.
+    2. Click **Call the API from the page** and read the warning that appears.
+
+    <StorageSim />
+
+    This is a simulation, so nothing leaves the page. It is also why every token-handling lesson in Module 2 keeps repeating that **XSS is the root problem**: the best storage choice shrinks the damage, and the only cure is not to have the bug (output encoding, a strict Content Security Policy, careful dependencies).
+  </Step>
+
+  <Step id="code" title="Code">
+    The login handler is the pattern in a few lines. The access token goes out in the JSON body for the page to hold, the refresh token goes out in the cookie, and nothing is written anywhere the page's storage could see.
+
+    <CodeTabs
+      go="labs/02-jwt/go/server.go#L160-L166"
+      ts="labs/02-jwt/ts/src/app.ts#L112-L114"
+      notes={{
+        165: "The refresh token: an HttpOnly, SameSite=Strict cookie scoped to /refresh.",
+        166: "The access token: the JSON body, with token_type Bearer and expires_in 300.",
+        113: "The refresh cookie, appended to the response.",
+        114: "The access token in the body.",
+      }}
+    />
+
+    And the header that keeps both out of caches. Any response that carries a token or identity says `no-store`.
+
+    <CodeTabs
+      go="labs/02-jwt/go/server.go#L63-L69"
+      ts="labs/02-jwt/ts/src/app.ts#L85-L91"
+      notes={{
+        66: "Cache-Control: no-store on every token-bearing route.",
+        88: "The same header, applied to /login, /api/profile and /refresh.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Any script running on your page has your page's full privileges. That is XSS, and it decides the storage question.",
+        "localStorage and sessionStorage are readable by every script on the origin. Do not keep tokens there.",
+        "Recommended: the access token in memory, the refresh token in an HttpOnly, Secure, SameSite cookie scoped to the refresh path.",
+        "A cookie is sent automatically, so it needs CSRF protection. An Authorization header is not, so it does not.",
+        "XSS can still use the session while the page is open. The pattern limits how long, not whether.",
+      ]}
+      interview={[
+        {
+          q: "Where should a single-page app store its JWTs?",
+          a: "The access token in memory only, and the refresh token in an HttpOnly, Secure, SameSite cookie limited to the refresh endpoint. On a reload the app calls refresh to get a new access token. Avoid localStorage, because any injected script can read it. For the highest assurance use a backend-for-frontend so tokens never reach the browser.",
+        },
+        {
+          q: "HttpOnly cookie versus localStorage: what is the trade-off?",
+          a: "localStorage is readable by any script on the origin, so XSS can steal the token, but requests need an explicit Authorization header and so are not exposed to CSRF. An HttpOnly cookie cannot be read by scripts, but the browser attaches it automatically, so you need SameSite and CSRF defenses. Neither stops XSS from acting as the user while the page is open.",
+        },
+        {
+          q: "If the access token is only in memory, is XSS still a problem?",
+          a: "Yes. The injected script can call your API and your refresh endpoint from inside the page, and the browser attaches the cookie. It cannot exfiltrate the refresh token, so the attack ends when the page closes or the session is revoked. You still must prevent XSS: output encoding, a strict Content Security Policy and trusted dependencies.",
+        },
+        {
+          q: "Why scope the refresh cookie to Path=/refresh?",
+          a: "So the browser sends it only to the refresh and logout endpoints, not with every API call. That keeps it out of logs and handlers that never need it, and shrinks the places where it can leak.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why the lab keeps the access token in memory and the refresh token in an HttpOnly cookie, and what an XSS attacker can still do."
+      rubric={[
+        "Memory and HttpOnly cookies cannot be read and copied by an injected script, while localStorage can",
+        "The access token is short-lived and never stored; the refresh token is hidden from JavaScript and path-scoped",
+        "The cookie is sent automatically, so SameSite and CSRF defenses are needed",
+        "XSS can still make requests as the user while the page is open, so the real fix is to prevent XSS",
+      ]}
+    />
   </Step>
 </LessonSteps>

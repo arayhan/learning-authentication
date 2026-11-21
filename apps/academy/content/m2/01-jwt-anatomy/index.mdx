@@ -1,17 +1,153 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    In Module 1 the server remembered you: a cookie pointed at a row in a table. Now imagine the server remembers nothing, and you simply hand it a small signed note that says who you are. Any server that trusts the signer can read the note and believe it.
+
+    That note is a **JSON Web Token (JWT)**, and it is everywhere: API calls, single sign-on, mobile apps. It is also misunderstood more often than almost anything in authentication.
+
+    <Analogy title="The concert wristband">
+      Anyone can look at your wristband and read the date and the zone printed on it. Nobody can make a new one, because the print is hard to copy. The guard never phones the box office: the wristband itself is the proof.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    A JWT is three pieces of text joined by dots: **header.payload.signature**. This is the compact form of a JSON Web Signature (JWS, RFC 7515), and the claims format is defined in RFC 7519.
+
+    | Part | What it holds | Example from the lab |
+    |---|---|---|
+    | **Header** | How the token was signed | `{"alg":"RS256","typ":"JWT","kid":"k3Hq9ZmB1vW8eYrT"}` |
+    | **Payload** | The **claims**: statements about the user and the token | `{"iss":"http://localhost:4102","sub":"6f1c…","exp":1767225900,…}` |
+    | **Signature** | A signature over `base64url(header) + "." + base64url(payload)` | 256 bytes for RS256 |
+
+    Header and payload are JSON, encoded with **base64url**. That is an encoding, not encryption: anyone holding the token can read both. The signature is what makes the token trustworthy. Change one byte of the payload and the signature no longer matches.
+
+    <SequenceFlow flow={flows.statefulVsStateless} />
+
+    Two properties follow, and every lesson in this module builds on them.
+
+    1. **Self-contained.** The API verifies the token with a key and reads the claims from the token itself. There is no session lookup.
+    2. **Bearer.** Whoever holds the token is treated as the user. The signature proves who *issued* it, not who is *presenting* it.
+
+    <Callout type="security">
+      A signed JWT is **readable by everyone who holds it**. Never put passwords, secrets or sensitive personal data in the payload. If you need confidentiality, use an encrypted token (JWE) or keep the data on the server and put only an id in the token.
+    </Callout>
+  </Step>
+
+  <Step id="claims" title="Claims">
+    The payload is a set of claims. A few names are **registered** (RFC 7519 section 4.1), and a verifier is expected to understand them.
+
+    | Claim | Meaning | A verifier must |
+    |---|---|---|
+    | `iss` | **Issuer**: who made the token | Check it equals the issuer it trusts |
+    | `sub` | **Subject**: who the token is about | Use it as the user id |
+    | `aud` | **Audience**: which API it is for | Reject it if the API is not listed |
+    | `exp` | **Expiration** time, in Unix seconds | Reject it after this moment |
+    | `iat` | **Issued at** | Treat it as information |
+    | `nbf` | **Not before** | Reject it before this moment |
+    | `jti` | **JWT ID**, unique per token | Use it for logging or a deny list |
+
+    The header has its own important field: **`kid`** (key id), which says which of the issuer's keys signed the token. Lesson 2 uses it. **`alg`** names the signature algorithm. It is attacker-controlled input, and lesson 5 shows what happens when a verifier believes it.
+
+    Lab 02 adds one custom claim, `email`. Custom claims are fine, but remember the token is readable and cannot be taken back: keep them few and non-sensitive.
+
+    <Callout type="warn">
+      The lab puts `exp` five minutes after `iat`. Lifetimes are a security setting, not a convenience. Because a self-contained token cannot be recalled, a short life is the main thing that limits what a stolen token is worth.
+    </Callout>
+  </Step>
+
+  <Step id="tradeoff" title="Sessions or tokens?">
+    Neither one is simply better. They move the state to a different place.
+
+    | | Server session (Module 1) | JWT access token |
+    |---|---|---|
+    | Where the truth lives | A row in the server's session table | Inside the signed token |
+    | Check on each request | Look up the session | Verify the signature and claims |
+    | Revoke at once | Yes, delete the row | Not until `exp` (lesson 6) |
+    | Several services | They must share the session store | Each needs only the public key |
+    | Size on the wire | A short random id | Hundreds of bytes, sent on every request |
+    | Stale data | Always current | Claims are frozen at issue time |
+
+    JWTs make the most sense when **more than one service** has to trust the same login, as with an identity provider and several APIs, or when you want verification with no shared database. For a single web app talking to its own backend, a plain server session is often simpler and safer.
+
+    <Callout type="info">
+      Worth asking of your own system: when **sso-backend** issues a token that **core-api** accepts, which claims does core-api actually check, and is that the same list as the table above?
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="decode" title="Decode a token">
+    Below is a real token in the lab's format, built with a throwaway key. Decoding it needs no key and checks nothing, so it works even though its `exp` is long gone.
+
+    1. Spot the three colours: header, payload, signature.
+    2. Read the explanation under each claim (hover also shows it), and look at how `exp` is shown as relative time.
+    3. Replace the text with garbage, or with `a.b.c`, and see the inline error instead of a crash.
+
+    <TokenDecoder defaultToken="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImszSHE5Wm1CMXZXOGVZclQifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjQxMDIiLCJhdWQiOiJsYWIwMi1hcGkiLCJzdWIiOiI2ZjFjMmI5ZS0zYTRkLTRlOGYtOWIxYS03YzVkMmUwZjhhMzQiLCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjU5MDAsImp0aSI6IlhrM3E5Wm1CMXZXOGVZclQ1dUxwQTdzRDBmR2hKY040aU9hRTZiUXdWeVUifQ.CuGey27Ie14YL8uqlMkjrCUvVECt6nDd3iZ6EFC_cofWogIgkOrRN7gjzi21UEXXRuakSzfYSFE8d4aqWWNXAEe3BAdzyxdkd6hp66gXfat5Pfb1ynDtmqga2Vn9zi3DlxNpNqHgF1XyzrMHOO6xKiM9at_MByW_OSwdvkyh080odZoFDV9yRFezLzhhVtxBegtSd_bdXmoniQTExoMwD8snHVvxI3tj-tIRxO-x6gIi5IODrb1tJ4-PxDRhn60sv4iqofrDGRU3K8J0WkTRhjK812h2NMEITMukC2KnWL7Sorcuwd186gFHtXIWKYbiB-TqXPn4iNwCOHuwXFmfag" />
+
+    Lesson 2 lets you verify a token you got from the lab itself.
+  </Step>
+
+  <Step id="code" title="Code">
+    Here is how the lab builds the token you just decoded. It signs an RS256 token with a `kid` header and the registered claims, and it sets `exp` five minutes after `iat`.
+
+    <CodeTabs
+      go="labs/02-jwt/go/tokens.go#L24-L33"
+      ts="labs/02-jwt/ts/src/tokens.ts#L11-L23"
+      notes={{
+        28: "iss and aud name the issuer and the API this token is for.",
+        29: "iat, exp (now + 300 seconds) and a random jti.",
+        31: "The kid header tells verifiers which key in the JWKS signed this.",
+        15: "The header carries alg, typ and kid.",
+        20: "exp is five minutes after iat.",
+      }}
+    />
+
+    Note what is **not** here: no user lookup, no table write for this token. Signing is a pure function of the claims and the private key.
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "A JWT is header.payload.signature: base64url JSON plus a signature (RFC 7519, RFC 7515).",
+        "The payload is readable by anyone who holds the token. Signed does not mean secret.",
+        "The signature proves the issuer made it and nothing changed. It does not prove who is presenting it: JWTs are bearer tokens.",
+        "A verifier checks signature, iss, aud and exp. kid picks the key, alg must be pinned by the verifier.",
+        "Self-contained tokens trade easy revocation for not needing a shared session store.",
+      ]}
+      interview={[
+        {
+          q: "What is a JWT and what is in it?",
+          a: "A compact, URL-safe token of three base64url parts: a header (algorithm and key id), a payload of claims such as iss, sub, aud and exp, and a signature over the first two parts. It is a JWS, and the issuer signs it so any verifier holding the key can trust it without a database lookup.",
+        },
+        {
+          q: "Is a JWT encrypted?",
+          a: "No, a normal signed JWT is only encoded. Anyone who holds it can read the claims. The signature gives integrity and authenticity, not confidentiality. An encrypted JWT (JWE) exists, but most APIs use signed tokens and keep the payload free of sensitive data.",
+        },
+        {
+          q: "Sessions or JWTs?",
+          a: "Sessions keep the state on the server: simple, instantly revocable, but they need a shared store when several services are involved. JWTs carry the state in the token: services verify offline, but you cannot revoke before expiry and claims go stale. For a single web app a session is often enough. For many services, a JWT from one identity provider fits well.",
+        },
+        {
+          q: "Which claims must an API validate?",
+          a: "The signature with a pinned algorithm, exp so expired tokens are rejected, iss so only the trusted issuer counts, and aud so a token made for another API is rejected. This is the guidance of RFC 8725, the JWT best current practices.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why a signed JWT can be read by anyone, yet cannot be forged, and what that means for what you put in it."
+      rubric={[
+        "Header and payload are only base64url encoded, so anyone can decode them",
+        "The signature covers header and payload, so changing either breaks verification",
+        "Only the holder of the signing key can make a valid token",
+        "So no secrets in the payload, and keep claims few and non-sensitive",
+      ]}
+    />
   </Step>
 </LessonSteps>

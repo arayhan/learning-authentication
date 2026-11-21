@@ -113,12 +113,73 @@ describe("m1 lab tasks", () => {
   }
 });
 
-describe("module 1 content", () => {
-  const dir = path.join(__dirname, "../../content/m1");
+describe("m2 lab tasks", () => {
+  const rt = "rt=abc; Path=/refresh; Max-Age=1209600; HttpOnly; SameSite=Strict";
+  const e02 = (method: string, p: string, status: number, o: Parameters<typeof ev>[3] = {}): TraceEvent => ({ ...ev(method, p, status, o), lab: "02" });
+  const tokenBody = '{"access_token":"eyJ.x.y","token_type":"Bearer","expires_in":300}';
+  const cases: Record<string, { hit: TraceEvent; miss: TraceEvent[] }> = {
+    "m2-l2/jwks-fetched": {
+      hit: e02("GET", "/.well-known/jwks.json", 200),
+      miss: [e02("GET", "/.well-known/jwks.json", 500), e02("POST", "/.well-known/jwks.json", 200), e02("GET", "/jwks.json", 200)],
+    },
+    "m2-l3/login-access-token": {
+      hit: e02("POST", "/login", 200, { body: tokenBody }),
+      miss: [e02("POST", "/login", 401, { body: '{"error":"invalid credentials"}' }), e02("POST", "/login", 200), e02("POST", "/login", 200, { body: '{"ok":true}' }), e02("GET", "/login", 200, { body: tokenBody })],
+    },
+    "m2-l3/refresh-rotated": {
+      hit: e02("POST", "/refresh", 200, { resHeaders: { "set-cookie": [rt] }, body: tokenBody }),
+      miss: [
+        e02("POST", "/refresh", 200),
+        e02("POST", "/refresh", 200, { resHeaders: { "set-cookie": ["sid=abc; Path=/"] } }),
+        e02("POST", "/refresh", 401, { resHeaders: { "set-cookie": [rt] } }),
+        e02("POST", "/refresh/logout", 204, { resHeaders: { "set-cookie": [rt] } }),
+        e02("POST", "/login", 200, { resHeaders: { "set-cookie": [rt] } }),
+      ],
+    },
+    "m2-l3/refresh-reuse-401": {
+      hit: e02("POST", "/refresh", 401, { body: '{"error":"invalid refresh token"}' }),
+      miss: [e02("POST", "/refresh", 200), e02("POST", "/login", 401), e02("GET", "/refresh", 401), e02("POST", "/refresh/logout", 401)],
+    },
+    "m2-l6/logout-revokes": {
+      hit: e02("POST", "/refresh/logout", 204),
+      miss: [e02("POST", "/refresh/logout", 500), e02("POST", "/logout", 204), e02("POST", "/refresh", 204), e02("GET", "/refresh/logout", 204)],
+    },
+  };
+
+  it("covers every lab task of module 2 exactly once, all on lab 02", () => {
+    const all = course[1].lessons.flatMap((l) => l.labTasks.map((t) => `${l.id}/${t.id}`));
+    expect(all.sort()).toEqual(Object.keys(cases).sort());
+    for (const l of course[1].lessons) for (const t of l.labTasks) expect(t.lab).toBe("02");
+  });
+
+  for (const [ref, { hit, miss }] of Object.entries(cases)) {
+    it(`${ref}: matches its event, ignores near misses`, () => {
+      const [lesson, id] = ref.split("/");
+      const task = getLesson(lesson)!.labTasks.find((t) => t.id === id)!;
+      expect(task.match(hit)).toBe(true);
+      for (const m of miss) expect(task.match(m)).toBe(false);
+    });
+  }
+});
+
+describe("ref namespace", () => {
+  it("step, quiz, lab-task and attack ids are unique within every lesson", () => {
+    for (const l of course.flatMap((m) => m.lessons)) {
+      const ids = [...l.steps.map((s) => s.id), ...l.quizzes.map((q) => q.id), ...l.labTasks.map((t) => t.id), ...l.attacks.map((a) => a.id)];
+      expect(new Set(ids).size, `${l.id}: ${ids.join(", ")}`).toBe(ids.length);
+    }
+  });
+});
+
+describe.each([
+  { m: 0, dir: "m1", labDir: "01-sessions", boss: "m1-l7" },
+  { m: 1, dir: "m2", labDir: "02-jwt", boss: "m2-l7" },
+])("module $dir content", ({ m, dir: modDir, labDir, boss }) => {
+  const dir = path.join(__dirname, "../../content", modDir);
   const mdx = readdirSync(dir).map((d) => ({ d, src: readFileSync(path.join(dir, d, "index.mdx"), "utf8") }));
 
   it("every <CodeTabs> reference resolves to a non-empty, fully in-range snippet (catches line drift in the labs)", async () => {
-    const refs = mdx.flatMap(({ d, src }) => [...src.matchAll(/\b(?:go|ts)="(labs\/[^"]+)"/g)].map((m) => ({ d, spec: m[1] })));
+    const refs = mdx.flatMap(({ d, src }) => [...src.matchAll(/\b(?:go|ts)="(labs\/[^"]+)"/g)].map((x) => ({ d, spec: x[1] })));
     expect(refs.length).toBeGreaterThan(10);
     for (const { d, spec } of refs) {
       const { range } = parseSpec(spec);
@@ -127,19 +188,19 @@ describe("module 1 content", () => {
       expect(snip.ok, `${d}: ${spec}`).toBe(true);
       if (!snip.ok) continue;
       expect(snip.code.trim(), `${d}: ${spec} is empty`).not.toBe("");
-      expect(snip.code.split("\n").length,`${d}: ${spec} runs past the end of the file`).toBe(range![1] - range![0] + 1);
+      expect(snip.code.split("\n").length, `${d}: ${spec} runs past the end of the file`).toBe(range![1] - range![0] + 1);
     }
   });
 
   it("lessons 1 to 6 each cite lab code in both languages", () => {
-    for (const { d, src } of mdx.filter((m) => /^0[1-6]/.test(m.d))) {
-      expect(src, d).toMatch(/<CodeTabs[^>]*\bgo="labs\/01-sessions\/go\//);
-      expect(src, d).toMatch(/<CodeTabs[^>]*\bts="labs\/01-sessions\/ts\/src\//);
+    for (const { d, src } of mdx.filter((x) => /^0[1-6]/.test(x.d))) {
+      expect(src, d).toMatch(new RegExp(`<CodeTabs[^>]*\\bgo="labs/${labDir}/go/`));
+      expect(src, d).toMatch(new RegExp(`<CodeTabs[^>]*\\bts="labs/${labDir}/ts/src/`));
     }
   });
 
   it("every lesson has a gated quiz of 3 questions with a why (boss: 10 questions, 600s, 0.8), and every recap has 3+ interview answers", () => {
-    for (const l of course[0].lessons) {
+    for (const l of course[m].lessons) {
       for (const q of l.quizzes) {
         expect(q.questions, `${l.id}/${q.id}`).toHaveLength(q.boss ? 10 : 3);
         for (const x of q.questions) {
@@ -149,9 +210,17 @@ describe("module 1 content", () => {
         }
       }
     }
-    expect(getLesson("m1-l7")!.quizzes[0].boss).toEqual({ seconds: 600, passRatio: 0.8 });
-    for (const { d, src } of mdx.filter((m) => !m.d.startsWith("07"))) {
+    expect(getLesson(boss)!.quizzes[0].boss).toEqual({ seconds: 600, passRatio: 0.8 });
+    for (const { d, src } of mdx.filter((x) => !x.d.startsWith("07"))) {
       expect([...src.matchAll(/\bq: "/g)].length, d).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe("module 2 attacks", () => {
+  it("declares the brief's attacks", () => {
+    const attacks = (id: string) => getLesson(id)!.attacks.map((a) => `${a.id}:${a.kind}`);
+    expect(attacks("m2-l4")).toEqual(["xss-storage:simulated"]);
+    expect(attacks("m2-l5")).toEqual(["alg-none:live", "key-confusion:live", "expired:live"]);
   });
 });

@@ -1,17 +1,166 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    JWT cryptography is rarely the weak point. The verifier code around it is. Most real JWT breaches did not break RSA or HMAC: they talked a verifier into **not checking**, using fields the attacker wrote themselves.
+
+    Almost all of it comes down to one mistake: trusting the token to describe how it should be verified.
+
+    <Analogy title="The guard and the checked-by line">
+      A guard compares each pass against the list of approved stamps. Then someone hands over a pass with the line "checked by: no one needed". A guard who reads that line and waves them through has let the visitor write the rule.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    A verifier receives bytes from the network and must decide whether to believe them. Every part of the token is **untrusted input** until the signature is checked, and the header is the most dangerous part: it says which algorithm and which key to use.
+
+    <SequenceFlow flow={flows.algNone} />
+
+    The rule that kills the whole class is simple, and it is in RFC 8725, the JWT best current practices:
+
+    1. **Pin the algorithm.** The verifier decides which algorithm it accepts, per issuer. It never uses the token's `alg` to choose.
+    2. **Bind the key to the algorithm.** An RSA public key is only ever used for an RSA verification, never handed to an HMAC.
+    3. **Validate the claims.** `exp`, `iss` and `aud` are checked every time. A valid signature is where verification starts, not where it ends.
+
+    The lab has two verifiers behind `GET /api/profile`. The default is **secure** and does all three. A request with `X-Lab-Mode: vulnerable` goes to a deliberately broken one, shown below, so you can watch each mistake fail in the real world.
+  </Step>
+
+  <Step id="flaws" title="The attack catalogue">
+    | Attack | What the attacker controls | Why it works | Defense |
+    |---|---|---|---|
+    | **`alg: none`** | The `alg` header | The verifier sees `none` and skips the signature | Pin algorithms. Reject `none` |
+    | **RS256 to HS256 confusion** | The `alg` header | The verifier uses the RSA **public** key bytes as an HMAC secret, and the attacker knows them | Pin algorithms. Bind each key to one algorithm |
+    | **Expired or foreign token** | Nothing: a replayed, genuine token | Only the signature is checked | Require `exp`, `iss` and `aud` |
+    | **`kid` injection** | The `kid` header | The server uses `kid` in a file path or an SQL string | Treat `kid` as a lookup into a fixed set. Parameterize queries |
+    | **`jku` / `x5u` / `jwk` header** | A URL or a key inside the header | The verifier fetches or trusts the attacker's key | Ignore those headers. Use only your configured JWKS |
+    | **Weak HS256 secret** | Nothing | A short secret can be brute-forced offline from one captured token | A random secret of at least 256 bits, or an asymmetric algorithm |
+    | **Token in a URL** | Nothing | URLs leak into logs, history and `Referer` | Send it in the `Authorization` header only |
+
+    The first three are the ones you will break in a moment. A few details are worth knowing.
+
+    - **Key confusion** needs the verifier's code to use one `key` value for any algorithm. A library that takes `(token, key)` and lets the token pick the algorithm is exactly that. This is why modern libraries want you to pass the allowed algorithms.
+    - **A token for the wrong audience** is a quieter version of the same bug. One issuer often serves many APIs, and without an `aud` check any API's token opens any other.
+    - **There is no "just decode" shortcut.** Code that only base64-decodes the payload and reads `sub` is trusting an unsigned note.
+
+    <Callout type="info">
+      Worth asking of your own setup: does **core-api** pass an explicit algorithm list to its JWT library, and does it check `iss` and `aud` as well as `exp`? Which library and version does it use, and what are its defaults?
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="breakit" title="Break it">
+    Three live attacks against the lab. Each card asks the lab to forge a token (the helper `POST /__attack/sign` exists only in vulnerable mode), then sends **the same token** to `GET /api/profile` twice: once to the secure verifier and once to the vulnerable one.
+
+    Click **Run** on each card. You are looking for `401` on the left and `200` on the right.
+
+    <JwtAttackLab />
+
+    What each card shows:
+
+    - **alg: none** was accepted by the vulnerable verifier with no signature at all. The secure verifier rejected it because it only accepts RS256.
+    - **Key confusion** was signed with HMAC, using the public key's PEM text as the secret. An attacker can rebuild that text from the public JWKS from lesson 2, so no secret was needed. The secure verifier never performs an HMAC check, so the token fails.
+    - **Expired** carries a genuine RS256 signature, only its `exp` is an hour old. The vulnerable verifier never reads `exp`.
+
+    Open the Inspector and look at the `401` rows. They carry `WWW-Authenticate: Bearer error="invalid_token"`, which is how a server tells a client that the token, not the request, was the problem (RFC 6750).
+
+    <Callout type="security">
+      The vulnerable mode is a switch on the server, so it can be shown. A real API has no such switch, and the same flaws sit in code like the listing below. Reviewing JWT handling means reading it for exactly these four flaws.
+    </Callout>
+  </Step>
+
+  <Step id="code" title="Code">
+    The broken verifier. Every flaw is a real bug class, and each is annotated in the file as FLAW 1 to 4.
+
+    <CodeTabs
+      go="labs/02-jwt/go/naive.go#L14-L64"
+      ts="labs/02-jwt/ts/src/naive.ts#L4-L37"
+      notes={{
+        40: "FLAW 1: the alg comes from the token, which the attacker wrote.",
+        42: "FLAW 2: alg none needs no signature, whatever sits in the signature slot.",
+        45: "FLAW 3: the PUBLIC key text becomes an HMAC secret. Anyone can compute that.",
+        51: "FLAW 4: exp, aud and iss are never looked at.",
+        22: "FLAW 1 in TypeScript: the alg is whatever the header says.",
+        24: "FLAW 2: none returns the claims unverified.",
+        27: "FLAW 3: the public PEM as an HMAC key.",
+        30: "FLAW 4: no exp, aud or iss check.",
+      }}
+    />
+
+    How the lab builds the forgeries. None of them needs a secret: unsigned, an HMAC with a public key, and a real signature over an old `exp`.
+
+    <CodeTabs
+      go="labs/02-jwt/go/tokens.go#L70-L86"
+      ts="labs/02-jwt/ts/src/tokens.ts#L52-L70"
+      notes={{
+        72: "none: just set alg and leave the signature empty.",
+        74: "HS256 with a header the verifier will believe.",
+        83: "Expired: exp forced an hour into the past.",
+        54: "none: alg set, no signature.",
+        57: "HS256, signed below with the public key text.",
+        66: "Expired: exp forced into the past.",
+      }}
+    />
+
+    Now compare with the verifier you read in lesson 2: it passes `["RS256"]` as the only allowed algorithm and requires `exp`, `iss` and `aud`. Those three arguments are the whole difference.
+
+    <CodeTabs
+      go="labs/02-jwt/go/tokens.go#L35-L50"
+      ts="labs/02-jwt/ts/src/tokens.ts#L25-L38"
+      notes={{
+        40: "Pinned: RS256 only.",
+        41: "exp is required.",
+        42: "iss is checked.",
+        43: "aud is checked.",
+        31: "Pinned: RS256 only.",
+        32: "iss is checked.",
+        33: "aud is checked.",
+        35: "exp is required.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Everything in a token is untrusted until the signature is verified, and the header is the most dangerous part.",
+        "alg: none and RS256 to HS256 confusion both come from letting the token choose the algorithm.",
+        "Pin the algorithm in the verifier, and use each key only for its own algorithm (RFC 8725).",
+        "A valid signature is not enough: require exp, iss and aud, so old and foreign tokens are rejected.",
+        "Never follow jku, x5u or jwk headers, and never trust a kid blindly.",
+      ]}
+      interview={[
+        {
+          q: "What is the alg: none attack?",
+          a: "The attacker builds a token with the alg header set to none and an empty signature. A verifier that obeys the header skips signature checking and accepts any claims, so the attacker can claim to be any user. The fix is for the verifier to pin the algorithms it accepts and reject none.",
+        },
+        {
+          q: "Explain the RS256 to HS256 key confusion attack.",
+          a: "The server verifies with an RSA public key. The attacker sets alg to HS256 and signs the token with HMAC, using that public key as the secret, which they know because it is public. A verifier that trusts the header uses its public key as the HMAC key, the check passes, and the forged token is accepted. The fix is to pin RS256 and never pass the same key into different algorithms.",
+        },
+        {
+          q: "What must you validate on every incoming JWT?",
+          a: "The signature with an algorithm you pinned, then exp (so expired tokens fail), iss (only your trusted issuer) and aud (the token is meant for this API). Optionally nbf. This is the checklist in RFC 8725.",
+        },
+        {
+          q: "How do you review code that verifies JWTs?",
+          a: "Check that the allowed algorithms are passed explicitly and none is excluded, that the key type matches the algorithm, that exp, iss and aud are enforced, that the key comes from configured trust and not from the token (kid, jku, x5u), and that no code path decodes the payload without verifying.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why trusting the token's own alg header breaks verification, using one of the three attacks you just ran."
+      rubric={[
+        "The header is written by whoever builds the token, so it is untrusted",
+        "alg none or HS256 with the public key lets an attacker make a token that passes",
+        "The verifier must pin the algorithm and bind the key to it",
+        "Signature is only the start: exp, iss and aud must be checked too",
+      ]}
+    />
   </Step>
 </LessonSteps>

@@ -1,17 +1,211 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    Lesson 1 left you with a problem. A self-contained token cannot be recalled, so it must expire fast. But nobody wants to type a password every five minutes.
+
+    The fix is to use **two** tokens with two different jobs: a short-lived one that opens doors, and a long-lived one whose only power is to get a new short-lived one.
+
+    <Analogy title="The day pass and the membership card">
+      A gym gives you a day pass you show at every door, and it expires tonight. The membership card stays in your wallet, and you only show it at the front desk to get tomorrow's pass. Lose the day pass and you lose a day. Lose the card and the desk can cancel it.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    | | **Access token** | **Refresh token** |
+    |---|---|---|
+    | Job | Authorize an API call | Get a new access token |
+    | Format in the lab | A signed JWT (RS256) | 32 random bytes, opaque |
+    | Lifetime in the lab | 5 minutes | 14 days |
+    | Sent to | Every API request | Only `/refresh` |
+    | Checked by | Signature and claims, no lookup | A database lookup |
+    | Can be revoked | Not before `exp` | Yes, at any time |
+    | Stored on the server | Nothing | Only its sha256 |
+
+    The login response in the lab shows both, in the two places they belong:
+
+    ```text
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+    Cache-Control: no-store
+    Set-Cookie: rt=Xk3q9ZmB1v…; Path=/refresh; Max-Age=1209600; HttpOnly; SameSite=Strict
+
+    {"access_token":"eyJhbGci…","token_type":"Bearer","expires_in":300}
+    ```
+
+    The **access token** goes in the body, so the page's code can hold it and send `Authorization: Bearer <token>`. That header is defined by RFC 6750. The **refresh token** goes in a cookie the page's JavaScript cannot read, and each attribute earns its place:
+
+    | Attribute | Why |
+    |---|---|
+    | `HttpOnly` | An XSS bug cannot read and copy the refresh token (lesson 4) |
+    | `Path=/refresh` | The browser sends it only to `/refresh` and `/refresh/logout`, never with ordinary API calls |
+    | `SameSite=Strict` | Never sent on a cross-site request |
+    | `Max-Age=1209600` | 14 days, then the user logs in again |
+    | `Secure` | Missing only because the lab runs on `http://localhost`. In production it is required |
+
+    `Cache-Control: no-store` matters too: a response carrying a token must never sit in a browser or proxy cache.
+
+    <Callout type="info">
+      Why is the refresh token **not** a JWT? Its whole point is to be revocable and to live in a server-side table, so a random opaque value that the server looks up is the right shape. Storing only the sha256 follows the Module 1 rule: a leaked database must not contain usable credentials.
+    </Callout>
+  </Step>
+
+  <Step id="rotation" title="Rotation">
+    A refresh token that lives 14 days is a juicy target. **Refresh token rotation** shrinks the damage: every time you use a refresh token, the server retires it and hands out a new one.
+
+    <SequenceFlow flow={flows.refreshRotation} />
+
+    The server keeps tokens in a **family**, one family per login. Each use does this in one database transaction:
+
+    1. Look up the presented token's row, and lock it.
+    2. If it is **already used or revoked**: revoke the whole family and answer 401.
+    3. Otherwise mark it used, insert its successor in the same family, and return a new access token and a new cookie.
+
+    Step 2 is **reuse detection**. If a thief and the real user both hold token 1, whoever refreshes second presents a spent token. The server cannot tell which of them is the thief, so it revokes the family. Both must log in again, and the thief is out. The OAuth 2.0 Security Best Current Practice (RFC 9700) recommends this for refresh tokens.
+
+    <Callout type="warn">
+      Rotation has a real cost. Two tabs refreshing at the same moment, or a retry after a lost response, can present the same token twice, and look exactly like theft. Production systems either serialize refreshes on the client or allow a very short grace window for the previous token. The lab locks the row (`FOR UPDATE`) so only one of two concurrent refreshes can win, and the loser is treated as reuse.
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Run the whole cycle once: log in, call the API, refresh. The seeded user is `alice@example.com`.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="02"
+      actions={[
+        { label: "Log in", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
+        { label: "Profile", method: "GET", path: "/api/profile", headers: { Authorization: "Bearer {{accessToken}}" } },
+        { label: "Profile, no token", method: "GET", path: "/api/profile" },
+        { label: "Refresh", method: "POST", path: "/refresh" },
+      ]}
+    />
+
+    1. Click **Log in**. The body has the access token. Open the `POST /login` row in the Inspector and look at the **Cookies** tab: `rt` with `HttpOnly`, `Path=/refresh` and `SameSite=Strict`.
+    2. Click **Profile**. The console sent `Authorization: Bearer <your token>` for you and the API answered `200`.
+    3. Click **Profile, no token**. The answer is `401` with `WWW-Authenticate: Bearer`: no credentials at all, as RFC 6750 asks. A token that is present but bad gets `error="invalid_token"` instead.
+    4. Click **Refresh**. The browser attaches the cookie without any help from the page. You get a new access token and a **new** `rt` in `Set-Cookie`. The old one is now spent.
+
+    You never typed or copied the refresh token, and neither could a script on the page: it is HttpOnly.
+  </Step>
+
+  <Step id="reuse" title="Reuse detection">
+    A browser will not let you replay an old cookie, so for this part act as the thief with `curl`. Use the port of the implementation you selected: `4102` for Go, `4202` for TypeScript. Run this in Git Bash, WSL or any POSIX shell.
+
+    ```bash
+    LAB=http://localhost:4102
+    # log in and keep the cookie jar
+    curl -s -c jar.txt -X POST $LAB/login -H 'Content-Type: application/json' \
+      -d '{"email":"alice@example.com","password":"correct-horse-battery"}' > /dev/null
+    # copy the refresh token out of the jar (a thief would get it by other means)
+    RT=$(awk '$6=="rt"{print $7}' jar.txt)
+
+    # first use: 200, new access token, new rt
+    curl -s -o /dev/null -w '%{http_code}\n' -X POST $LAB/refresh -H "Cookie: rt=$RT"
+    # second use of the SAME token: 401, and the whole family is revoked
+    curl -s -o /dev/null -w '%{http_code}\n' -X POST $LAB/refresh -H "Cookie: rt=$RT"
+    ```
+
+    The second call prints `401`. Look at the Inspector: the first `POST /refresh` returned 200, the second returned 401, and the lab task above ticked.
+
+    The first call also issued a successor token. The second call revoked the whole family, so that successor is dead too and the real user is logged out as well. That is the intended outcome: a copied token costs both parties their session, and the user finds out the next time they refresh.
+  </Step>
+
+  <Step id="code" title="Code">
+    The cookie. Every attribute from the table is one line here.
+
+    <CodeTabs
+      go="labs/02-jwt/go/refresh.go#L36-L45"
+      ts="labs/02-jwt/ts/src/refresh.ts#L16-L20"
+      notes={{
+        40: "HttpOnly, SameSite=Strict, Path=/refresh and a 14-day Max-Age. No Secure only because the lab is plain http://localhost.",
+        44: "Clearing the cookie is the same cookie with MaxAge -1.",
+        19: "The same attributes as a raw Set-Cookie string.",
+        20: "Clearing it: Max-Age=0.",
+      }}
+    />
+
+    Rotation itself. The row is locked, a reused token revokes its family, and the new token is inserted in the same transaction as the old one is retired.
+
+    <CodeTabs
+      go="labs/02-jwt/go/refresh.go#L56-L97"
+      ts="labs/02-jwt/ts/src/refresh.ts#L30-L55"
+      notes={{
+        71: "FOR UPDATE: two concurrent refreshes of one token cannot both succeed.",
+        78: "Reuse detection. A used or revoked token means it was copied.",
+        79: "Revoke every token of the family.",
+        87: "Otherwise: a fresh random successor.",
+        88: "The presented token is retired (used_at).",
+        92: "The successor joins the same family.",
+        42: "The same lock in TypeScript.",
+        44: "Reuse detection.",
+        45: "Revoke the family. Returning here commits it, so the revocation sticks.",
+        49: "A fresh successor, retired predecessor and a new row, all in one transaction.",
+      }}
+    />
+
+    And the handler that ties it to the token response: rotate first, then issue the access token and set the new cookie.
+
+    <CodeTabs
+      go="labs/02-jwt/go/server.go#L203-L225"
+      ts="labs/02-jwt/ts/src/app.ts#L139-L146"
+      notes={{
+        204: "The refresh token is read from the cookie, never from the request body.",
+        209: "Rotate: retire the old token and get its successor.",
+        218: "A fresh access token for the same user.",
+        223: "The new refresh token goes out in the cookie.",
+        140: "Cookie in, rotation next.",
+        143: "Same sequence: issue the access token...",
+        144: "...and set the successor cookie.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Two tokens, two jobs: a short-lived JWT access token and a long-lived opaque refresh token.",
+        "The refresh token lives in an HttpOnly, SameSite=Strict cookie scoped to /refresh. The access token is held by the page and sent as a Bearer header.",
+        "The server stores only the sha256 of the refresh token, so it can look it up and revoke it.",
+        "Rotation: each refresh retires the token and issues a successor in the same family.",
+        "Reuse detection: a spent token coming back revokes the whole family and forces a new login.",
+      ]}
+      interview={[
+        {
+          q: "Why use both an access token and a refresh token?",
+          a: "A self-contained access token cannot be revoked, so it needs a short life to limit a theft. The refresh token lets the user stay signed in without re-entering a password: it is long-lived but used rarely, only against one endpoint, and the server can revoke it because it is checked against a database.",
+        },
+        {
+          q: "What is refresh token rotation and what does it protect against?",
+          a: "Every use of a refresh token returns a new one and retires the old one. If an old token is ever presented again, the server knows it was copied, revokes the whole token family and forces a fresh login. It turns a silent, long-lived theft into a detected one.",
+        },
+        {
+          q: "Where do you store the refresh token in a browser app?",
+          a: "In an HttpOnly cookie with SameSite=Strict (or Lax), Secure, and a Path limited to the refresh endpoint, so JavaScript cannot read it and it is not sent with ordinary requests. The access token is kept in memory.",
+        },
+        {
+          q: "What are the downsides of rotation?",
+          a: "Concurrency. Two tabs, or a retried request, can send the same token twice, which looks like theft and logs the user out. Mitigate it by serializing refreshes in the client, or by allowing a short grace window for the previous token on the server.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate what happens, step by step, when a stolen refresh token is used after the real user has already refreshed."
+      rubric={[
+        "The real user's refresh retired the old token and issued a new one",
+        "The thief presents the old, already used token",
+        "The server sees it is spent, revokes the whole family and returns 401",
+        "Both the thief and the user must log in again, which exposes the theft",
+      ]}
+    />
   </Step>
 </LessonSteps>

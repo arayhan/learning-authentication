@@ -22,16 +22,17 @@ type Result = { label: string; status: number; headers: [string, string][]; body
 
 const KEY_HEADERS = ["content-type", "location", "set-cookie", "www-authenticate", "cache-control", "retry-after"];
 const CSRF = "{{csrfToken}}";
+const ACCESS = "{{accessToken}}";
 const RANDOM_EMAIL = "{{randomEmail}}";
 const EMAIL = "{{email}}";
 const uses = (a: ConsoleAction, placeholder: string) => JSON.stringify([a.headers, a.body]).includes(placeholder);
 const newEmail = () => `learner-${[...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, "0")).join("")}@example.com`;
 
-/** The `csrfToken` field of a JSON response body, if it has one. */
-function csrfOf(text: string): string | null {
+/** A string field of a JSON response body, if it has one. */
+function fieldOf(text: string, field: "csrfToken" | "access_token"): string | null {
   try {
-    const v = JSON.parse(text) as { csrfToken?: unknown };
-    return typeof v?.csrfToken === "string" ? v.csrfToken : null;
+    const v = JSON.parse(text) as Record<string, unknown>;
+    return typeof v?.[field] === "string" ? (v[field] as string) : null;
   } catch {
     return null;
   }
@@ -41,6 +42,7 @@ function csrfOf(text: string): string | null {
  * Fires requests at the selected lab implementation and shows the response inline. String values in an action's
  * `headers` and `body` may contain {{csrfToken}}: it is replaced by the last `csrfToken` this console received from
  * the selected implementation (a later response without one keeps it), or by "" before any login.
+ * {{accessToken}} works the same way with the `access_token` field (lab 02 login and refresh responses), or "" before a login.
  * {{randomEmail}} becomes a fresh `learner-<8 hex>@example.com` generated at send time (and remembered by this
  * console instance); {{email}} is the last one generated, or "" before any.
  */
@@ -50,6 +52,8 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
   const [busy, setBusy] = useState(false);
   const [csrf, setCsrf] = useState<{ impl: string; token: string } | null>(null);
   const token = csrf?.impl === impl ? csrf.token : "";
+  const [access, setAccess] = useState<{ impl: string; token: string } | null>(null);
+  const accessToken = access?.impl === impl ? access.token : "";
   const [email, setEmail] = useState("");
 
   const run = async (a: ConsoleAction) => {
@@ -57,7 +61,7 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
     try {
       const fresh = uses(a, RANDOM_EMAIL) ? newEmail() : null;
       if (fresh) setEmail(fresh);
-      const sub = (v: string) => v.replaceAll(CSRF, token).replaceAll(RANDOM_EMAIL, fresh ?? "").replaceAll(EMAIL, fresh ?? email);
+      const sub = (v: string) => v.replaceAll(CSRF, token).replaceAll(ACCESS, accessToken).replaceAll(RANDOM_EMAIL, fresh ?? "").replaceAll(EMAIL, fresh ?? email);
       const headers: Record<string, string> = Object.fromEntries(Object.entries(a.headers ?? {}).map(([k, v]) => [k, sub(v)]));
       if (a.body !== undefined) headers["Content-Type"] ??= "application/json";
       if (a.vulnerable) headers["X-Lab-Mode"] = "vulnerable";
@@ -68,8 +72,10 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
         credentials: "include",
       });
       const text = await res.text();
-      const newToken = csrfOf(text);
+      const newToken = fieldOf(text, "csrfToken");
       if (newToken) setCsrf({ impl, token: newToken });
+      const newAccess = fieldOf(text, "access_token");
+      if (newAccess) setAccess({ impl, token: newAccess });
       setResult({
         label: a.label,
         status: res.status,
@@ -104,6 +110,7 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
       </div>
       {!email && actions.some((a) => uses(a, EMAIL)) && <p className="text-xs text-muted-foreground">Register first</p>}
       {!token && actions.some((a) => uses(a, CSRF)) && <p className="text-xs text-muted-foreground">Log in first to get a CSRF token</p>}
+      {!accessToken && actions.some((a) => uses(a, ACCESS)) && <p className="text-xs text-muted-foreground">Log in first</p>}
       {result === "offline" && <OfflineCard lab={lab} impl={impl} retrying={false} />}
       {result && result !== "offline" && (
         <div aria-live="polite" className="space-y-2 rounded-md border bg-muted/30 p-3 font-mono text-xs">

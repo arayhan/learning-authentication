@@ -1,5 +1,6 @@
 import type { Flow } from "@/components/flow/types";
 import { m1Flows } from "./m1";
+import { m2Flows } from "./m2";
 
 const demo: Flow = {
   id: "demo",
@@ -30,4 +31,4 @@ const demo: Flow = {
   ],
 };
 
-export const flows = { demo, ...m1Flows } satisfies Record<string, Flow>;
+export const flows = { demo, ...m1Flows, ...m2Flows } satisfies Record<string, Flow>;

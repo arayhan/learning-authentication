@@ -14,7 +14,10 @@ import { CsrfSim } from "@/components/playground/CsrfSim";
 import { FixationAttack } from "@/components/playground/FixationAttack";
 import { HashPlayground } from "@/components/playground/HashPlayground";
 import { LabConsole } from "@/components/playground/LabConsole";
+import { JwtAttackLab } from "@/components/playground/JwtAttackLab";
 import { LabTasks } from "@/components/playground/LabTasks";
+import { StorageSim } from "@/components/playground/StorageSim";
+import { TokenDecoder } from "@/components/playground/TokenDecoder";
 
 // Prose is capped at ~68ch; wide blocks (code, shots) opt out in their own components.
 const components: MDXComponents = {
@@ -50,6 +53,9 @@ const components: MDXComponents = {
   HashPlayground,
   CsrfSim,
   FixationAttack,
+  TokenDecoder,
+  StorageSim,
+  JwtAttackLab,
 };
 
 export function useMDXComponents(): MDXComponents {

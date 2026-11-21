@@ -1,6 +1,22 @@
 <LessonSteps>
   <Step id="intro" title="Intro">
-    Content coming soon.
+    Ten questions from the whole module, ten minutes, and you need **8 correct** to pass. There is no feedback until the end, and choices are shuffled each attempt. You can retry as often as you like.
+
+    Skim the cheat sheet first. It is also a good thing to reread before an interview.
+
+    | Topic | One line to remember |
+    |---|---|
+    | JWT anatomy | `header.payload.signature`, base64url JSON. Readable by anyone with the token, so no secrets. A bearer token. |
+    | Claims | Check `iss`, `aud`, `exp` (and `nbf`) every time. `sub` is the user. `kid` picks the key. |
+    | Algorithms | HS256 shares one secret, so every verifier can forge. RS256 and ES256 verify with a public key. |
+    | JWKS | Public keys at a well-known URL. Cache it, refetch on unknown `kid`, never follow `jku` or `x5u` from a token. |
+    | Rotation of keys | Publish the new key, sign with it, retire the old key after its tokens expire. |
+    | Access + refresh | Short JWT access token (5 min), opaque long-lived refresh token, stored hashed and revocable. |
+    | Refresh rotation | Retire the token on every use. A spent token coming back revokes the whole family (RFC 9700). |
+    | Storage | Access token in memory, refresh token in `HttpOnly; Secure; SameSite` cookie on a narrow `Path`. Never localStorage. |
+    | XSS | HttpOnly blocks reading, not using. The only cure is not to have the bug. |
+    | Attacks | Never let the token choose the algorithm. Pin it, bind keys to it, and validate `exp`, `iss`, `aud` (RFC 8725). |
+    | Revocation | Refresh revocation is immediate. Access tokens live until `exp`. Instant revocation needs a per-request server check. |
 
     <BossQuiz id="boss" />
   </Step>

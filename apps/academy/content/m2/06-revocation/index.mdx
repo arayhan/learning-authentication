@@ -1,17 +1,166 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    A user clicks **Log out**. Or support disables an account. Or someone reports a stolen laptop. Surely every token for that user stops working right now?
+
+    Not with a self-contained token. This is the price of lesson 1's design, and it is the most common wrong answer in JWT interviews: "we just delete it on logout".
+
+    <Analogy title="The cancelled card at an offline shop">
+      The bank cancels your lost card, but a shop with no network connection checks only the printed expiry date. It happily accepts the card until that date passes. The only ways to close the gap are short expiry dates, or shops that phone the bank.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    An API that verifies a JWT offline asks nobody. Nothing the server does after issuing the token can reach it: the token is valid until `exp`, and that is by design.
+
+    <SequenceFlow flow={flows.revocation} />
+
+    So "logout" really means two different things, and it helps to keep them apart.
+
+    | | What it does | Effect |
+    |---|---|---|
+    | **Refresh token revocation** | Marks the refresh family revoked and clears the cookie | No new access tokens can be issued. Takes effect at once |
+    | **Access token expiry** | The token simply runs out | Up to `expires_in` seconds later: 5 minutes in the lab |
+
+    The logout is complete after the access token's remaining lifetime. A client should also throw its copy away, but that protects nothing against someone who already copied it.
+
+    Claims go stale in the same way. If a user is demoted or disabled, a token issued before that still says the old role until it expires.
+  </Step>
+
+  <Step id="strategies" title="Strategies">
+    There is a menu, and every item reintroduces some state.
+
+    | Strategy | How it works | Cost |
+    |---|---|---|
+    | **Short lifetime** | Accept the staleness: `exp` is minutes away | More refreshes. The floor on exposure never reaches zero |
+    | **Revoke the refresh token** (the lab) | Delete or mark the refresh family | Access tokens still live until `exp` |
+    | **Deny list** | Store revoked `jti` values, or session ids, and check each request | A lookup per call. Entries only need to live until `exp` |
+    | **Token introspection** | The API asks the authorization server whether the token is active (RFC 7662) | A network call per request, and a runtime dependency |
+    | **"Valid after" per user** | Store one timestamp per user, reject tokens with an older `iat` | One small lookup per request. Gives "log out everywhere" and "password changed" |
+    | **Opaque reference tokens** | Do not use a JWT: the token is a random id looked up on each call | Back to Module 1's sessions, with all their properties |
+
+    A reasonable default is the first two together, which is what the lab does. Add a deny list or a "valid after" check only where a five-minute window is too long, such as admin consoles or payments.
+
+    <Callout type="warn">
+      Do not rely on the client. A request to delete the token from `localStorage` only helps an honest page. A copied token keeps working, so real revocation has to happen on the server.
+    </Callout>
+
+    <Callout type="info">
+      Worth asking of your own system: when an account is disabled in **sso-backend**, how long can an already-issued token still be used on **core-api**? What bounds that, and is there any check in between?
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Log out and watch what stops working, and what does not.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="02"
+      actions={[
+        { label: "Log in", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct-horse-battery" } },
+        { label: "Profile", method: "GET", path: "/api/profile", headers: { Authorization: "Bearer {{accessToken}}" } },
+        { label: "Log out", method: "POST", path: "/refresh/logout" },
+        { label: "Refresh", method: "POST", path: "/refresh" },
+      ]}
+    />
+
+    1. Click **Log in**, then **Profile**: `200`.
+    2. Click **Log out**. The answer is `204 No Content` and a `Set-Cookie` that deletes `rt`. Logout is a `POST` to `/refresh/logout` because the refresh cookie is only sent to paths under `/refresh`.
+    3. Click **Refresh**. It returns `401`: the cookie is gone and the family is revoked.
+    4. Click **Profile** again. It still returns **`200`**. The console kept the access token from your login, and the API has no reason to doubt it until it expires. That is the gap from the table above, live.
+
+    The browser deleted the cookie, so step 3 arrives without one. To see the **server-side** revocation of a token someone *copied*, use curl again (port `4102` for Go, `4202` for TypeScript):
+
+    ```bash
+    LAB=http://localhost:4102
+    curl -s -c jar.txt -X POST $LAB/login -H 'Content-Type: application/json' \
+      -d '{"email":"alice@example.com","password":"correct-horse-battery"}' > /dev/null
+    RT=$(awk '$6=="rt"{print $7}' jar.txt)
+
+    curl -s -o /dev/null -w 'logout: %{http_code}\n'  -X POST $LAB/refresh/logout -H "Cookie: rt=$RT"
+    curl -s -o /dev/null -w 'refresh with the copied token: %{http_code}\n' -X POST $LAB/refresh -H "Cookie: rt=$RT"
+    ```
+
+    The copy still has the right bytes, and it is refused: `204`, then `401`.
+  </Step>
+
+  <Step id="code" title="Code">
+    Logout is small. It revokes the family of the presented token and clears the cookie. An unknown or missing token is a harmless no-op, so logging out twice is fine.
+
+    <CodeTabs
+      go="labs/02-jwt/go/server.go#L227-L236"
+      ts="labs/02-jwt/ts/src/app.ts#L148-L154"
+      notes={{
+        229: "Revoke the family of the presented refresh token.",
+        234: "Delete the cookie in the browser as well.",
+        235: "204: nothing to return.",
+        151: "Revoke the family, if a cookie was sent.",
+        152: "Clear the cookie.",
+        153: "204 No Content.",
+      }}
+    />
+
+    One statement does the revoking: every token of the family is marked, used or not.
+
+    <CodeTabs
+      go="labs/02-jwt/go/refresh.go#L99-L105"
+      ts="labs/02-jwt/ts/src/refresh.ts#L57-L61"
+      notes={{
+        102: "Set revoked_at on every live token of the family.",
+        103: "The family is found from the presented token's hash.",
+        59: "The same single UPDATE in TypeScript.",
+        60: "Family lookup by the hash of the presented token.",
+      }}
+    />
+
+    Compare it with the check that runs on every API call, in `verifyAccess`: it reads no table. That asymmetry is the whole lesson.
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "A self-contained token cannot be revoked before exp: the API verifies it offline.",
+        "Logout revokes the refresh token family at once, but the access token lives until it expires.",
+        "Short access tokens put an upper bound on how long a revocation takes to be effective.",
+        "Immediate revocation needs state: a deny list, introspection, or a per-user valid-after timestamp.",
+        "Claims go stale too: a role change is not seen until the token is replaced.",
+      ]}
+      interview={[
+        {
+          q: "How do you log a user out when you use JWTs?",
+          a: "Revoke the refresh token on the server (and clear its cookie), and have the client drop the access token. The access token cannot be recalled, so it stays valid until it expires, which is why it is short-lived. If a sensitive API cannot wait, add a deny list of token ids or a per-user valid-after timestamp checked on each request.",
+        },
+        {
+          q: "What is the trade-off of stateless tokens when it comes to revocation?",
+          a: "Verification needs no server state, which is the benefit, so there is nothing to delete either. Any scheme for immediate revocation adds a server-side check per request, so you are choosing between scalability and simplicity on one side and instant control on the other. Most systems take short lifetimes plus refresh revocation.",
+        },
+        {
+          q: "What is token introspection?",
+          a: "An endpoint, defined in RFC 7662, where an API sends a token to the authorization server and gets back whether it is active and its metadata. It gives you immediate revocation and fresh claims, at the cost of a network call per request and a dependency on the authorization server. Many systems cache the answer briefly.",
+        },
+        {
+          q: "A user's account is disabled. What happens to their existing tokens?",
+          a: "The refresh token family is revoked, so no new access tokens are issued. Any access token already issued keeps working until its exp, unless the API also checks a deny list or valid-after value. So the maximum delay is the access token lifetime.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why logging out does not immediately stop an old access token, and what you would do if five minutes is too long."
+      rubric={[
+        "APIs verify the signature and exp offline and never ask the server",
+        "Logout revokes only the refresh token, so no new access tokens are issued",
+        "The old access token keeps working until exp, which is why it is short",
+        "For immediate effect add a server-side check: a deny list, introspection or a valid-after timestamp",
+      ]}
+    />
   </Step>
 </LessonSteps>
