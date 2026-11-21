@@ -7,7 +7,8 @@ import type { XpEvent } from "@/lib/course/types";
 import { award, getProgress, QuizFailed, safeTz } from "@/lib/game/award";
 
 const ref = z.string().max(128);
-const answers = z.array(z.number().int().min(0)).max(50);
+// -1 = unanswered (a timed-out boss submits what it has); it never matches a correct index.
+const answers = z.array(z.number().int().min(-1)).max(50);
 const Body = z.object({
   event: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("step"), ref }),

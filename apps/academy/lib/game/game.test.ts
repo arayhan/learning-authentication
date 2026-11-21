@@ -48,6 +48,11 @@ describe("gradeQuiz", () => {
     expect(gradeQuiz(q, [1]).passed).toBe(false);
     expect(gradeQuiz(q, [1, 0, 0]).passed).toBe(false);
   });
+  it("-1 (unanswered) is always wrong", () => {
+    expect(gradeQuiz(q, [-1, -1])).toEqual({ score: 0, total: 2, passed: false });
+    expect(gradeQuiz(boss, [0, 0, 0, 0, -1], 1000)).toMatchObject({ score: 4, passed: true });
+    expect(gradeQuiz(boss, [0, 0, 0, -1, -1], 1000).passed).toBe(false);
+  });
   it("boss needs ratio and time", () => {
     expect(gradeQuiz(boss, [0, 0, 0, 0, 1], 1000)).toMatchObject({ score: 4, total: 5, passed: true });
     expect(gradeQuiz(boss, [0, 0, 0, 1, 1], 1000).passed).toBe(false);

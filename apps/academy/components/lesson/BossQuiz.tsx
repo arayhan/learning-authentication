@@ -5,6 +5,7 @@ import { ProgressError, useProgress } from "@/components/game/ProgressProvider";
 import { Button } from "@/components/ui/button";
 import { ChoiceButton } from "./ChoiceButton";
 import { useLesson } from "./LessonProvider";
+import { useGate } from "./stepContext";
 import { useSender } from "./useSender";
 
 type Phase = "idle" | "running" | "submitting" | "failed" | "error";
@@ -31,6 +32,7 @@ export function BossQuiz({ id }: { id: string }) {
   const { seconds, passRatio } = quiz.boss;
   const ref = `${lesson.id}/${id}`;
   const { isDone } = useProgress();
+  useGate(id, true); // the step's Continue waits for the boss
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [orders, setOrders] = useState<number[][]>([]); // orders[q][displayIdx] = original choice index
@@ -39,7 +41,7 @@ export function BossQuiz({ id }: { id: string }) {
   const [started, setStarted] = useState(0);
   const [left, setLeft] = useState(seconds * 1000);
   const [score, setScore] = useState<{ score: number; total: number } | null>(null);
-  const { fire, awaitingLogin } = useSender((o) => {
+  const { fire, awaitingLogin, openReauth } = useSender((o) => {
     if (o.ok) return;
     const body = o.error instanceof ProgressError && o.error.status === 422 ? (o.error.body as { score: number; total: number }) : null;
     setScore(body ? { score: body.score, total: body.total } : null);
@@ -115,9 +117,12 @@ export function BossQuiz({ id }: { id: string }) {
         </>
       )}
       {phase === "submitting" && (
-        <p role="status" className="text-sm text-muted-foreground">
-          {awaitingLogin ? "Sign in again to submit your answers." : "Grading…"}
-        </p>
+        <div className="space-y-3">
+          <p role="status" className="text-sm text-muted-foreground">
+            {awaitingLogin ? "Sign in again to submit your answers." : "Grading…"}
+          </p>
+          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Sign in again</Button>}
+        </div>
       )}
       {phase === "failed" && (
         <div className="space-y-3">

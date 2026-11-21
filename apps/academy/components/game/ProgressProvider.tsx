@@ -20,6 +20,8 @@ type Ctx = {
   isDone(ref: string): boolean;
   /** Increments after a successful in-place re-login so callers can retry what returned "unauthorized". */
   reauthCount: number;
+  /** Re-opens the re-login dialog (e.g. after it was dismissed while an event is still parked). */
+  openReauth(): void;
 };
 
 const ProgressCtx = createContext<Ctx | null>(null);
@@ -81,10 +83,12 @@ export function ProgressProvider({ initial, children }: { initial: ProgressState
     return result;
   }, []);
 
+  const openReauth = useCallback(() => setReauthOpen(true), []);
+
   const value = useMemo<Ctx>(() => {
     const done = new Set(state.completed);
-    return { state, send, isDone: (ref) => done.has(ref), reauthCount };
-  }, [state, send, reauthCount]);
+    return { state, send, isDone: (ref) => done.has(ref), reauthCount, openReauth };
+  }, [state, send, reauthCount, openReauth]);
 
   return (
     <ProgressCtx.Provider value={value}>

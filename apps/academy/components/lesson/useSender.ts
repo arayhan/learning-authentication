@@ -12,7 +12,7 @@ export type Outcome = { ok: true; result: AwardResult } | { ok: false; error: Pr
  * (the provider opens the re-login dialog), so nothing the learner did is lost.
  */
 export function useSender(onOutcome: (o: Outcome) => void) {
-  const { send, reauthCount } = useProgress();
+  const { send, reauthCount, openReauth } = useProgress();
   const [busy, setBusy] = useState(false);
   const [awaitingLogin, setAwaitingLogin] = useState(false);
   const parked = useRef<XpEvent | null>(null);
@@ -47,5 +47,5 @@ export function useSender(onOutcome: (o: Outcome) => void) {
     if (parked.current) void run(parked.current);
   }, [reauthCount, run]);
 
-  return { fire: (event: XpEvent) => (busy ? Promise.resolve() : run(event)), busy, awaitingLogin };
+  return { fire: (event: XpEvent) => (busy ? Promise.resolve() : run(event)), busy, awaitingLogin, openReauth };
 }

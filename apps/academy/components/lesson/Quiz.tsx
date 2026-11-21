@@ -22,7 +22,7 @@ export function Quiz({ id, gate = false }: { id: string; gate?: boolean }) {
   const [answers, setAnswers] = useState<number[]>([]);
   const [picked, setPicked] = useState<number | null>(null);
   const [fail, setFail] = useState<Fail | null>(null);
-  const { fire, awaitingLogin } = useSender((o) => {
+  const { fire, awaitingLogin, openReauth } = useSender((o) => {
     if (o.ok) return;
     const body = o.error instanceof ProgressError && o.error.status === 422 ? (o.error.body as { score: number; total: number }) : null;
     setFail(body ? { score: body.score, total: body.total } : "error");
@@ -67,9 +67,12 @@ export function Quiz({ id, gate = false }: { id: string; gate?: boolean }) {
           <Button variant="outline" onClick={() => submit(answers)}>Retry</Button>
         </div>
       ) : !q ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {awaitingLogin ? "Sign in again to submit your answers." : "Checking your answers…"}
-        </p>
+        <div className="space-y-3">
+          <p role="status" className="text-sm text-muted-foreground">
+            {awaitingLogin ? "Sign in again to submit your answers." : "Checking your answers…"}
+          </p>
+          {awaitingLogin && <Button variant="outline" onClick={openReauth}>Sign in again</Button>}
+        </div>
       ) : (
         <>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

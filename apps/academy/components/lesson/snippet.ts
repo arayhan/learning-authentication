@@ -14,11 +14,13 @@ export function parseSpec(spec: string): { file: string; range?: [number, number
 
 export type Snippet = { ok: true; code: string; startLine: number; lang: string } | { ok: false; path: string };
 
-/** Read `labs/…/file.go#L10-L42` (1-based, inclusive) relative to the repo root. A missing or out-of-root file is `{ok:false}`, never a throw. */
-export async function readSnippet(spec: string, root = REPO_ROOT): Promise<Snippet> {
+/** Read `labs/…/file.go#L10-L42` (1-based, inclusive) relative to the repo root, confined to `labs/`. A missing or out-of-root file is `{ok:false}`, never a throw. */
+export async function readSnippet(spec: string, repoRoot = REPO_ROOT): Promise<Snippet> {
   const { file, range } = parseSpec(spec);
-  const abs = path.resolve(root, file);
-  if (path.relative(root, abs).startsWith("..")) return { ok: false, path: file };
+  const abs = path.resolve(repoRoot, file);
+  // Only <repo>/labs is readable; absolute paths and ../ escapes (incl. a different Windows drive) are refused.
+  const rel = path.relative(path.join(repoRoot, "labs"), abs);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return { ok: false, path: file };
   try {
     // Labs live outside the app on purpose; opt out of Turbopack's whole-project file tracing.
     const lines = (await readFile(/* turbopackIgnore: true */ abs, "utf8")).replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");

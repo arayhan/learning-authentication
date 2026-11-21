@@ -80,7 +80,7 @@ test("kind mismatching the ref's real kind → 400", async () => {
 
 test("malformed answers / elapsedMs → 400", async () => {
   const bad = [
-    { kind: "quiz", ref: "m1-l1/q1", answers: [-1] },
+    { kind: "quiz", ref: "m1-l1/q1", answers: [-2] },
     { kind: "quiz", ref: "m1-l1/q1", answers: ["0"] },
     { kind: "quiz", ref: "m1-l1/q1", answers: new Array(51).fill(0) },
     { kind: "boss", ref: "m1-l7/boss", answers: [0], elapsedMs: -5 },
@@ -89,6 +89,16 @@ test("malformed answers / elapsedMs → 400", async () => {
   ];
   for (const event of bad) expect((await rawPost({ event, tz: "UTC" })).status).toBe(400);
   expect((await rawPost({ event: { kind: "step", ref: "m1-l1/hook" }, tz: "x".repeat(65) })).status).toBe(400);
+});
+
+test("boss with an unanswered (-1) answer inside the time limit → 422 (not 400), attempt stored as failed", async () => {
+  const res = await rawPost({ event: { kind: "boss", ref: "m1-l7/boss", answers: [-1], elapsedMs: 1000 }, tz: "UTC" });
+  expect(res.status).toBe(422);
+  expect(await res.json()).toEqual({ score: 0, total: 1, passed: false });
+  const attempts = await db.select().from(quizAttempts);
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]).toMatchObject({ quizRef: "m1-l7/boss", score: 0, passed: false });
+  expect(await db.select().from(xpEvents)).toHaveLength(0);
 });
 
 test("invalid tz falls back to UTC instead of failing", async () => {

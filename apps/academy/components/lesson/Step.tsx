@@ -15,7 +15,7 @@ export function Step({ id, title, children }: { id: string; title: string; child
   const { isDone } = useProgress();
   const [gates, setGates] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
-  const { fire, busy, awaitingLogin } = useSender((o) => setFailed(!o.ok));
+  const { fire, busy, awaitingLogin, openReauth } = useSender((o) => setFailed(!o.ok));
   const registerGate = useCallback((quizId: string) => {
     setGates((g) => [...g, quizId]);
     return () => setGates((g) => g.filter((x) => x !== quizId));
@@ -48,7 +48,12 @@ export function Step({ id, title, children }: { id: string; title: string; child
             {info.last ? "Finish lesson" : "Continue"}
           </Button>
           {blocked && <p className="text-sm text-muted-foreground">Pass the quiz to continue.</p>}
-          {awaitingLogin && <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>}
+          {awaitingLogin && (
+            <>
+              <p role="status" className="text-sm text-muted-foreground">Sign in again to save your progress.</p>
+              <Button variant="outline" onClick={openReauth}>Sign in again</Button>
+            </>
+          )}
           {failed && <p role="alert" className="text-sm text-destructive">Could not save your progress. Try again.</p>}
         </div>
       )}

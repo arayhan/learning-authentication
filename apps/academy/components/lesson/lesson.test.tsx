@@ -133,7 +133,72 @@ describe("lesson engine", () => {
   });
 });
 
+describe("reauth recovery", () => {
+  const signIn = async () => {
+    await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  };
+  const dismiss = async () => {
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  };
+
+  it("Quiz: dismissed dialog can be re-opened, answers are kept and re-sent after login", async () => {
+    const server = fakeServer(["m1-l1/hook", "m1-l1/concept"], { unauthorized: true });
+    renderLesson(["m1-l1/hook", "m1-l1/concept"]);
+    await answerAll(q1.questions.map((q) => q.answer));
+    await dismiss();
+    await userEvent.click(await screen.findByRole("button", { name: /sign in again/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await signIn();
+    await waitFor(() => expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled());
+    expect(server.posts).toEqual([{ kind: "quiz", ref: "m1-l1/q1", answers: q1.questions.map((q) => q.answer) }]);
+  });
+
+  it("BossQuiz: dismissed dialog can be re-opened and the answers are re-sent after login", async () => {
+    const server = fakeServer([], { unauthorized: true });
+    renderBossStep();
+    await userEvent.click(screen.getByRole("button", { name: /start/i }));
+    await userEvent.click(screen.getByRole("button", { name: "A" }));
+    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
+    await dismiss();
+    await userEvent.click(await screen.findByRole("button", { name: /sign in again/i }));
+    await signIn();
+    expect(await screen.findByText("Boss defeated.")).toBeInTheDocument();
+    expect(server.posts).toHaveLength(1);
+    expect(server.posts[0]).toMatchObject({ kind: "boss", ref: "m1-l7/boss", answers: [0] });
+  });
+});
+
+function renderBossStep() {
+  return render(
+    <ProgressProvider initial={progress([])}>
+      <LessonProvider lessonId="m1-l7">
+        <LessonSteps>
+          <Step id="intro" title="Intro">
+            <BossQuiz id="boss" />
+          </Step>
+        </LessonSteps>
+      </LessonProvider>
+    </ProgressProvider>,
+  );
+}
+
 describe("BossQuiz", () => {
+  it("gates its step: Continue stays disabled until the boss is passed", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99); // identity order
+    const server = fakeServer([]);
+    renderBossStep();
+    expect(screen.getByRole("button", { name: /finish lesson/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /start/i }));
+    await userEvent.click(screen.getByRole("button", { name: "A" })); // original index 0 = correct
+    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /finish lesson/i })).toBeEnabled());
+    expect(server.posts[0]).toMatchObject({ kind: "boss", answers: [0] });
+  });
+
   const renderBoss = () =>
     render(
       <ProgressProvider initial={progress([])}>
@@ -152,7 +217,7 @@ describe("BossQuiz", () => {
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
     expect(screen.getAllByRole("button", { name: /^[AB]$/ }).map((b) => b.textContent)).toEqual(["B", "A"]);
     await userEvent.click(screen.getByRole("button", { name: "B" })); // original index 1
-    await userEvent.click(screen.getByRole("button", { name: /finish/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
     await waitFor(() => expect(server.posts).toHaveLength(1));
     expect(server.posts[0]).toMatchObject({ kind: "boss", ref: "m1-l7/boss", answers: [1] });
     expect((server.posts[0] as { elapsedMs: number }).elapsedMs).toBeGreaterThanOrEqual(0);
