@@ -68,8 +68,8 @@ import { flows } from "@/content/flows";
     <LabConsole
       lab="01"
       actions={[
-        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
-        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
         { label: "Whoami", method: "GET", path: "/me" },
         { label: "Log out", method: "POST", path: "/logout", headers: { "X-CSRF-Token": "{{csrfToken}}" } },
         { label: "Whoami again", method: "GET", path: "/me" },
@@ -81,7 +81,7 @@ import { flows } from "@/content/flows";
     - **Log out** needs the CSRF token from your login response, because logging someone out is a state change too. The console fills it in from the last login. Without a token you would get `403`.
     - After logging out, **Whoami again** returns `401`. The server deleted the session, so even a copied cookie is dead.
 
-    Try Log in twice in a row and watch the `sid` change in the Inspector's Cookies tab. That is rotation.
+    Try **Log in** twice in a row and watch the `sid` change in the Inspector's Cookies tab. That is rotation.
   </Step>
 
   <Step id="code" title="Code">
@@ -108,7 +108,7 @@ import { flows } from "@/content/flows";
       notes={{
         259: "A constant-time comparison with the session's CSRF token.",
         264: "The server-side record is deleted. This is the part that matters.",
-        268: "clearCookie sends Max-Age=-1, so the browser drops its copy too.",
+        268: "The cookie is expired (Max-Age=0 on the wire; Go's MaxAge: -1 is only how it asks for that), so the browser drops its copy too.",
         159: "The same CSRF check before anything is deleted.",
         160: "Delete the server-side session.",
         161: "Clear the cookie.",

@@ -5,7 +5,7 @@ import { flows } from "@/content/flows";
     You type a password, the page changes, and the app greets you by name. Two separate questions were just answered, and mixing them up is behind a large share of real-world breaches.
 
     <Analogy title="The hotel">
-      At check-in the desk looks at your passport and decides you really are Sam. That is authentication. Your key card then opens only the floors and rooms Sam booked. That is authorization.
+      At check-in the desk checks your passport and decides you really are Sam: that is authentication. Your key card then opens only the floors Sam booked: that is authorization.
     </Analogy>
   </Step>
 
@@ -34,7 +34,7 @@ import { flows } from "@/content/flows";
     </Callout>
 
     <Callout type="info">
-      In a modular monolith with SSO, the split is physical. Your **sso-backend** answers "who is this?". What that person may do inside platform A, B or C is a separate question each platform (or `core-api`) has to answer itself. A valid SSO login never means "allowed everywhere".
+      Worth asking in your own SSO setup: which component answers "who is this?" (your **sso-backend**?), and where does each platform (or `core-api`) decide what that person may do? A valid SSO login should never mean "allowed everywhere".
     </Callout>
   </Step>
 
@@ -42,6 +42,30 @@ import { flows } from "@/content/flows";
     Three questions. Every answer has to be right, but you can try as often as you like.
 
     <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="code" title="Code">
+    The lab has no roles, but it still shows both checks in order. First, **authentication**: find the live session behind the cookie, or answer `401`.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L231-L246"
+      ts="labs/01-sessions/ts/src/app.ts#L145-L154"
+      notes={{
+        244: "No valid session: the server does not know who is calling, so 401.",
+        153: "Same rule in TypeScript: no session means 401.",
+      }}
+    />
+
+    Then a second check that can still say no to a **known** caller. `/transfer` finds the session first (a signed-in user passes), then refuses the request with `403` unless it carries the right secret. A role check in your own app has this exact shape: known user, then a policy, then 403.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L272-L280"
+      ts="labs/01-sessions/ts/src/app.ts#L165-L169"
+      notes={{
+        277: "A known user, refused: 403, not 401.",
+        169: "The same refusal in TypeScript.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">

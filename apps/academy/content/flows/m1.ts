@@ -183,7 +183,7 @@ const bruteForce: Flow = {
     { from: "attacker", to: "server", label: "guesses 2 to 5", danger: true, note: "Four more wrong guesses, four more identical 401s. Each failure is recorded." },
     { from: "attacker", to: "server", label: "POST /login (guess 6)", http: login("alice@example.com", "letmein"), danger: true, note: "The sixth attempt inside the window." },
     { from: "server", to: "db", label: "5 failures: blocked", note: "The count is already 5, so the password is not even checked. Even the correct one would be refused now." },
-    { from: "server", to: "attacker", label: "429 + Retry-After", http: `HTTP/1.1 429 Too Many Requests\n${JSON_HDR}\nRetry-After: 900\n\n{"error":"too many attempts"}`, note: "Guessing stops being cheap. The same limit applies to unknown emails, so the limiter does not leak which accounts exist." },
+    { from: "server", to: "attacker", label: "429 + Retry-After", http: `HTTP/1.1 429 Too Many Requests\n${JSON_HDR}\nRetry-After: 900\nCache-Control: no-store\n\n{"error":"too many attempts"}`, note: "Guessing stops being cheap. The same limit applies to unknown emails, so the limiter does not leak which accounts exist." },
     { from: "attacker", to: "server", label: "POST /login (unknown email)", http: login("nobody@example.com", "password1"), danger: true, note: "Does this account exist? The attacker tries to find out." },
     { from: "server", to: "server", label: "dummy argon2 verify", note: "No account, so the server hashes the attempt against a dummy hash anyway. Unknown email and wrong password cost the same time." },
     { from: "server", to: "attacker", label: "401 invalid credentials", http: generic401, note: "Byte-for-byte the same response as a wrong password. Nothing to enumerate." },

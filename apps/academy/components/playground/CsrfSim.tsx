@@ -109,6 +109,10 @@ export function CsrfSim() {
         </section>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Modern Chrome treats a cookie with no SameSite attribute as Lax by default, so &quot;no SameSite&quot; here models older browsers or an explicit SameSite=None.
+      </p>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={send}>Send forged request</Button>
         <span className="text-xs text-muted-foreground">The victim is signed in at the bank and just opened the evil page.</span>

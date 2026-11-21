@@ -35,6 +35,8 @@ import { flows } from "@/content/flows";
     | **Origin check** | Reject unsafe requests whose `Origin` (or `Sec-Fetch-Site`) is not your own site | Do not rely on `Referer` alone. Be strict about which origins are allowed |
     | Custom header + CORS | A JSON `fetch` with a custom header triggers a CORS preflight that other origins fail | A weak fallback. Do not rely on it as your only defense |
 
+    One caveat on `SameSite`: modern Chrome treats a cookie with no `SameSite` attribute as `Lax` by default. In the simulator, "no SameSite" therefore models older browsers or an explicit `SameSite=None`.
+
     The lab uses the **synchronizer token** pattern. Each session gets its own random CSRF token (you saw it in the `/login` response body). The browser's own JavaScript sends it back in an `X-CSRF-Token` header on every request that changes state, and the server compares it with the one stored for that session.
 
     <Callout type="security">
@@ -76,8 +78,8 @@ import { flows } from "@/content/flows";
     <LabConsole
       lab="01"
       actions={[
-        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
-        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
         { label: "Transfer, no token", method: "POST", path: "/transfer", body: { to: "bob@example.com", amount: 25 } },
         { label: "Transfer, with token", method: "POST", path: "/transfer", headers: { "X-CSRF-Token": "{{csrfToken}}" }, body: { to: "bob@example.com", amount: 25 } },
       ]}
@@ -122,7 +124,8 @@ import { flows } from "@/content/flows";
     <LabConsole
       lab="01"
       actions={[
-        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
         { label: "Forged transfer, no token", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 }, vulnerable: true },
         { label: "Transfer, no token (secure)", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 } },
       ]}

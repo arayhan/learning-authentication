@@ -62,7 +62,7 @@ const lesson: LessonMeta = {
       id: "transfer-403",
       label: "Send a transfer without a CSRF token and get a 403",
       lab: "01",
-      hint: "Log in, then click Transfer, no token. The request has a valid cookie and still fails.",
+      hint: "Click Register, then Log in, then click Transfer, no token. The request has a valid cookie and still fails.",
       match: (e) => e.req.method === "POST" && e.req.path === "/transfer" && e.res.status === 403 && !e.req.headers["x-csrf-token"],
     },
     {

@@ -62,7 +62,7 @@ const lesson: LessonMeta = {
       id: "logout-204",
       label: "Log out: POST /logout returns 204",
       lab: "01",
-      hint: "Log in first, then click Log out. The console sends the CSRF token for you. Then click Whoami again to see the session is gone.",
+      hint: "Click Register, then Log in, then click Log out. The console sends the CSRF token for you. Then click Whoami again to see the session is gone.",
       match: (e) => e.req.method === "POST" && e.req.path === "/logout" && e.res.status === 204,
     },
   ],

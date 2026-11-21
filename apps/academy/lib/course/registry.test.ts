@@ -131,8 +131,8 @@ describe("module 1 content", () => {
     }
   });
 
-  it("lessons 2 to 6 each cite lab code in both languages", () => {
-    for (const { d, src } of mdx.filter((m) => /^0[2-6]/.test(m.d))) {
+  it("lessons 1 to 6 each cite lab code in both languages", () => {
+    for (const { d, src } of mdx.filter((m) => /^0[1-6]/.test(m.d))) {
       expect(src, d).toMatch(/<CodeTabs[^>]*\bgo="labs\/01-sessions\/go\//);
       expect(src, d).toMatch(/<CodeTabs[^>]*\bts="labs\/01-sessions\/ts\/src\//);
     }

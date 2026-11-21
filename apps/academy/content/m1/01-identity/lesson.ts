@@ -10,6 +10,7 @@ const lesson: LessonMeta = {
     { id: "hook", title: "Hook" },
     { id: "concept", title: "Concept" },
     { id: "check", title: "Check" },
+    { id: "code", title: "Code" },
     { id: "recap", title: "Recap" },
   ],
   quizzes: [

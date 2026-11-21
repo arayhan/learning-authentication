@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProgressProvider } from "@/components/game/ProgressProvider";
 import { LessonProvider } from "@/components/lesson/LessonProvider";
@@ -347,6 +348,37 @@ describe("LabConsole", () => {
     const init = labCalls()[3][1];
     expect(init.headers).toMatchObject({ "X-CSRF-Token": "tok-123" });
     expect(init.body).toBe('{"to":"bob","note":"tok-123"}');
+  });
+
+  it("{{randomEmail}} makes a fresh learner address per send and {{email}} reuses the last one", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    const f = vi.fn(async () => new Response('{"ok":true}', { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", f);
+    wrap(
+      <LabConsole
+        lab="01"
+        actions={[
+          { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+          { label: "Login", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
+        ]}
+      />,
+    );
+    const emails = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost")).map(([, i]) => JSON.parse(i.body as string).email as string);
+    expect(screen.getByText("Register first")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Login/ }));
+    expect(emails()).toEqual([""]); // nothing registered yet
+    await userEvent.click(screen.getByRole("button", { name: /Register/ }));
+    expect(screen.queryByText("Register first")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Login/ }));
+    const [, first, again] = emails();
+    expect(first).toMatch(/^learner-[0-9a-f]{8}@example\.com$/);
+    expect(again).toBe(first);
+    await userEvent.click(screen.getByRole("button", { name: /Register/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Login/ }));
+    const all = emails();
+    expect(all[3]).toMatch(/^learner-[0-9a-f]{8}@example\.com$/);
+    expect(all[3]).not.toBe(first);
+    expect(all[4]).toBe(all[3]);
   });
 
   it("shows the start command instead of throwing when the lab is offline", async () => {

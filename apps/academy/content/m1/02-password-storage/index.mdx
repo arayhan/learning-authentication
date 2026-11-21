@@ -65,17 +65,15 @@
   </Step>
 
   <Step id="lab" title="Lab">
-    Now do it for real against the lab server. Register an account, then log in, and watch both requests in the Inspector.
+    Now do it for real against the lab server. Click **Register** (each click creates a brand-new `learner-...@example.com` account), then **Log in** as it, and watch both requests in the Inspector.
 
     <LabTasks />
 
     <LabConsole
       lab="01"
       actions={[
-        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
-        { label: "Register bob", method: "POST", path: "/register", body: { email: "bob@example.com", password: "correct horse battery" } },
-        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
-        { label: "Log in as bob", method: "POST", path: "/login", body: { email: "bob@example.com", password: "correct horse battery" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
       ]}
     />
 
@@ -84,7 +82,7 @@
     Check the duration column too. Register and login are the slowest requests in the list, because argon2id is doing its job.
 
     <Callout type="info">
-      A `409` means the address is already registered, which is fine for this lab. Credentials are in the Postgres `lab01` schema, shared by the Go and TS implementations, so an account created through one logs in through the other.
+      Every Register click makes a fresh random address, so you can repeat the lesson as often as you like. Credentials are in the Postgres `lab01` schema, shared by the Go and TS implementations, so an account created through one logs in through the other.
     </Callout>
   </Step>
 

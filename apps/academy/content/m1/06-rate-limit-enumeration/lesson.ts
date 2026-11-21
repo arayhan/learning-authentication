@@ -69,7 +69,7 @@ const lesson: LessonMeta = {
       id: "login-429",
       label: "Trigger the rate limit: a login attempt returns 429",
       lab: "01",
-      hint: "Register victim, then click Wrong password six times. The sixth attempt inside the window is refused with a 429.",
+      hint: "Click Register, then click Wrong password six times. The sixth attempt inside the window is refused with a 429.",
       match: (e) => e.req.method === "POST" && e.req.path === "/login" && e.res.status === 429,
     },
     {

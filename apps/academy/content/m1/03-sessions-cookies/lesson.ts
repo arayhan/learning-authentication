@@ -61,7 +61,7 @@ const lesson: LessonMeta = {
       id: "set-cookie-httponly",
       label: "Log in and spot a Set-Cookie with HttpOnly and SameSite=Lax",
       lab: "01",
-      hint: "Click Log in as alice, then open the POST /login row in the Inspector and look at the Cookies tab.",
+      hint: "Click Register, then Log in, then open the POST /login row in the Inspector and look at the Cookies tab.",
       match: (e) => {
         const raw = e.res.headers["set-cookie"];
         return [raw ?? []].flat().some((c) => /^sid=[^;]+/.test(c) && /;\s*HttpOnly/i.test(c) && /;\s*SameSite=Lax/i.test(c));

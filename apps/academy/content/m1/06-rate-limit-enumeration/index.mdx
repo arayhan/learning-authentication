@@ -30,7 +30,7 @@ import { flows } from "@/content/flows";
     NIST SP 800-63B requires limiting consecutive failed attempts per account (the ceiling it names is 100), and recommends other defenses besides, such as CAPTCHAs, throttling and breach-list checks. The lab's 5 per 15 minutes is stricter, which suits a demo.
 
     <Callout type="info">
-      Your **sso-backend** login fronts platforms A, B and C, so it is the single most valuable guessing target in the system. It deserves both per-account and per-IP limits, and its failures are worth alerting on.
+      Worth asking: your **sso-backend** login presumably fronts platforms A, B and C, which would make it the most valuable guessing target in the system. Does it have both per-account and per-IP limits, and does anyone get alerted on a spike of failures?
     </Callout>
   </Step>
 
@@ -58,17 +58,17 @@ import { flows } from "@/content/flows";
   </Step>
 
   <Step id="lab" title="Lab">
-    Break your own limiter, then compare two kinds of failure. Use the `victim` account, not alice, so that the lockout does not affect the other lessons.
+    Break your own limiter, then compare two kinds of failure. Register creates a fresh account each time, so a lockout only affects the account you are testing and you can rerun this as often as you like.
 
     <LabTasks />
 
     <LabConsole
       lab="01"
       actions={[
-        { label: "Register victim", method: "POST", path: "/register", body: { email: "victim@example.com", password: "correct horse battery" } },
-        { label: "Wrong password", method: "POST", path: "/login", body: { email: "victim@example.com", password: "not-the-password" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Wrong password", method: "POST", path: "/login", body: { email: "{{email}}", password: "not-the-password" } },
         { label: "Unknown email", method: "POST", path: "/login", body: { email: "ghost@example.com", password: "not-the-password" } },
-        { label: "Correct password", method: "POST", path: "/login", body: { email: "victim@example.com", password: "correct horse battery" } },
+        { label: "Correct password", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
       ]}
     />
 
@@ -77,7 +77,7 @@ import { flows } from "@/content/flows";
     3. Click **Correct password**. It is refused with `429` as well: the limit is checked before the password.
 
     <Callout type="warn">
-      `victim@example.com` is now locked for up to 15 minutes, and the console shows the exact wait in `Retry-After`. That is the intended behaviour, and also the price of any account-based limit: an attacker can lock a victim out, which is why the window is short.
+      That account is now locked for up to 15 minutes, and the console shows the exact wait in `Retry-After`. That is the intended behaviour, and also the price of any account-based limit: an attacker can lock a victim out, which is why the window is short.
     </Callout>
   </Step>
 

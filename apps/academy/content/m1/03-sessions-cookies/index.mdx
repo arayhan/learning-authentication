@@ -72,8 +72,8 @@ import { flows } from "@/content/flows";
     <LabConsole
       lab="01"
       actions={[
-        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
-        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Register", method: "POST", path: "/register", body: { email: "{{randomEmail}}", password: "correct horse battery" } },
+        { label: "Log in", method: "POST", path: "/login", body: { email: "{{email}}", password: "correct horse battery" } },
         { label: "Whoami", method: "GET", path: "/me" },
       ]}
     />
@@ -120,7 +120,7 @@ import { flows } from "@/content/flows";
     <CodeTabs go="labs/01-sessions/go/server.go#L231-L252" ts="labs/01-sessions/ts/src/app.ts#L145-L154" />
 
     <Callout type="info">
-      The same pattern is what a browser-facing SSO uses: a first-party session cookie on the SSO host, backed by a server-side record. Look at how your **sso-backend** names and flags that cookie, and compare it to the table above.
+      A browser-facing SSO typically follows the same pattern: a first-party session cookie on the SSO host, backed by a server-side record. Worth checking: how does your **sso-backend** name and flag its session cookie, and how does that compare to the table above?
     </Callout>
   </Step>
 
