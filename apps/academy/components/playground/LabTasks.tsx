@@ -65,7 +65,7 @@ function TaskList({ lessonId, tasks, lab }: { lessonId: string; tasks: LabTask[]
           const done = ticked.has(t.id) || isDone(`${lessonId}/${t.id}`);
           return (
             <li key={t.id} className="flex items-start gap-2 text-sm">
-              {done ? <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" /> : <Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
+              {done ? <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-success" /> : <Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
               <div>
                 <p className={done ? "text-muted-foreground line-through" : undefined}>
                   {t.label}

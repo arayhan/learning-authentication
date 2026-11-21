@@ -3,8 +3,8 @@ import { spawn, spawnSync } from "node:child_process";
 const win = process.platform === "win32";
 
 /** Spawns a child that can be killed as a whole tree (own process group on POSIX, taskkill /T on Windows). */
-export function spawnTree(command, args, { cwd, env }) {
-  const opts = { cwd, env: { ...process.env, ...env }, stdio: "inherit" };
+export function spawnTree(command, args, { cwd, env, stdio = "inherit" }) {
+  const opts = { cwd, env: { ...process.env, ...env }, stdio };
   // pnpm is a .cmd shim on Windows and cannot be spawned without a shell. Single string: args are plain words.
   return win && command === "pnpm"
     ? spawn([command, ...args].join(" "), { ...opts, shell: true })

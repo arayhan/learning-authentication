@@ -13,7 +13,7 @@ type Lab = {
 const lab = (title: string, ports: Lab["ports"], id: LabId): Lab => ({
   title,
   ports,
-  traceUrl: (impl) => `http://127.0.0.1:${ports[impl]}/__trace`,
+  traceUrl: (impl) => `http://localhost:${ports[impl]}/__trace`,
   startCmd: (impl) => `pnpm lab ${id} --${impl}`,
 });
 
@@ -23,4 +23,4 @@ export const labs: Record<LabId, Lab> = {
   "03": lab("OAuth + PKCE", { go: 4103, ts: 4203 }, "03"),
 };
 
-export const labBase = (id: LabId, impl: Impl) => `http://127.0.0.1:${labs[id].ports[impl]}`;
+export const labBase = (id: LabId, impl: Impl) => `http://localhost:${labs[id].ports[impl]}`;

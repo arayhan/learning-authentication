@@ -115,7 +115,7 @@ describe("Inspector", () => {
     expect(MockEventSource.instances[0].closed).toBe(true);
     act(() => void vi.advanceTimersByTime(3000));
     expect(MockEventSource.instances).toHaveLength(2);
-    expect(last().url).toBe("http://127.0.0.1:4101/__trace");
+    expect(last().url).toBe("http://localhost:4101/__trace");
   });
 
   it("renders a row once the stream opens and emits, newest on top", () => {
@@ -169,16 +169,16 @@ describe("Inspector", () => {
   it("switching impl closes the old EventSource and opens the new port", async () => {
     wrap(<Inspector lab="01" />);
     const first = last();
-    expect(first.url).toBe("http://127.0.0.1:4101/__trace");
+    expect(first.url).toBe("http://localhost:4101/__trace");
     await userEvent.click(screen.getByRole("radio", { name: "TS" }));
     expect(first.closed).toBe(true);
-    expect(last().url).toBe("http://127.0.0.1:4201/__trace");
+    expect(last().url).toBe("http://localhost:4201/__trace");
     expect(localStorage.getItem("academy:lab-impl")).toBe("ts");
   });
 
   it("lab 03 listens on the authorization server port", () => {
     wrap(<Inspector lab="03" />);
-    expect(last().url).toBe("http://127.0.0.1:4103/__trace");
+    expect(last().url).toBe("http://localhost:4103/__trace");
   });
 
   it("detail: cookies tab shows parsed Set-Cookie attributes, body is pretty, raw is HTTP text", async () => {
@@ -302,9 +302,9 @@ describe("LabConsole", () => {
     );
     expect(screen.getByText("vulnerable mode")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Login/ }));
-    const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://127.0.0.1"));
+    const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
     const [url, init] = labCalls()[0];
-    expect(url).toBe("http://127.0.0.1:4101/login");
+    expect(url).toBe("http://localhost:4101/login");
     expect(init.credentials).toBe("include");
     expect(init.method).toBe("POST");
     expect(init.body).toBe('{"email":"a"}');

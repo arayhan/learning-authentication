@@ -15,6 +15,10 @@
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-brand: var(--brand);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -52,6 +56,10 @@
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938); /* zinc-500 */
   --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.596 0.145 163.225); /* emerald-600 */
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.555 0.163 48.998); /* amber-700: text-safe on white */
+  --warning-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32); /* zinc-200 */
   --input: oklch(0.92 0.004 286.32);
   --ring: var(--brand);
@@ -75,6 +83,10 @@
   --muted: oklch(0.274 0.006 286.033);
   --muted-foreground: oklch(0.705 0.015 286.067); /* zinc-400 */
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.765 0.177 163.223); /* emerald-400 */
+  --success-foreground: oklch(0.141 0.005 285.823);
+  --warning: oklch(0.828 0.189 84.429); /* amber-400 */
+  --warning-foreground: oklch(0.141 0.005 285.823);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
 }

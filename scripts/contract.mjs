@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseContractArgs, resolveContract, resolveLab } from "./lab-config.mjs";
+import { assertPortFree } from "./port.mjs";
 import { killOnExit, killTree, spawnTree } from "./proc.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,6 +43,7 @@ try {
   for (const missing of [l.requires, c.requires].filter((p) => !existsSync(resolve(root, p)))) {
     throw new Error(`Lab ${lab} (${impl}) contract cannot run: ${missing} does not exist yet.`);
   }
+  await assertPortFree(l.port);
   server = spawnTree(l.command, l.args, { cwd: root, env: l.env });
   killOnExit([server]);
   server.on("error", (e) => console.error(`Could not start "${l.command}": ${e.message}`));

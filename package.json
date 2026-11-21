@@ -7,7 +7,7 @@
     "lab": "node scripts/lab.mjs",
     "contract": "node scripts/contract.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm run test:scripts && pnpm -r --if-present test",
     "db:up": "docker compose up -d"
   }
 }

@@ -66,7 +66,7 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
             <span className="font-mono text-xs text-muted-foreground">{a.method}</span>
             {a.label}
             {a.vulnerable && (
-              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+              <span className="rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
                 vulnerable mode
               </span>
             )}

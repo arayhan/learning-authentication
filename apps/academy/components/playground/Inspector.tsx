@@ -15,10 +15,10 @@ export const statusClass = (s: number) =>
   s >= 500
     ? "text-destructive"
     : s >= 400
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-warning"
       : s >= 300
         ? "text-brand"
-        : "text-emerald-600 dark:text-emerald-400";
+        : "text-success";
 
 /** Live HTTP timeline of one lab. Newest first; select a row for headers, cookies, body and raw text. */
 export function Inspector({ lab }: { lab: LabId }) {
@@ -34,7 +34,7 @@ export function Inspector({ lab }: { lab: LabId }) {
         <LabSwitcher />
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span aria-hidden className={cn("size-2 rounded-full", status === "online" ? "bg-emerald-500" : "bg-muted-foreground/50")} />
+            <span aria-hidden className={cn("size-2 rounded-full", status === "online" ? "bg-success" : "bg-muted-foreground/50")} />
             {status === "online" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}
           </span>
           <Button

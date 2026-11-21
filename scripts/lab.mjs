@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseLabArgs, resolveLab } from "./lab-config.mjs";
+import { assertPortFree } from "./port.mjs";
 import { killOnExit, spawnTree } from "./proc.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -13,6 +14,7 @@ try {
   if (!existsSync(resolve(root, r.requires))) {
     throw new Error(`Lab ${lab} (${impl}) not found: ${r.requires} does not exist yet.`);
   }
+  await assertPortFree(r.port);
   console.log(`Starting lab ${lab} (${impl}) on http://127.0.0.1:${r.port}`);
   const child = spawnTree(r.command, r.args, { cwd: root, env: r.env });
   killOnExit([child]);
