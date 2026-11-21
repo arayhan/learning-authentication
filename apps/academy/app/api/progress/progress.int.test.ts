@@ -55,17 +55,17 @@ test("10 concurrent identical events → xp 10", async () => {
 });
 
 test("wrong quiz answers → 422, attempt stored, xp unchanged", async () => {
-  const res = await rawPost({ event: { kind: "quiz", ref: "m1-l1/q1", answers: [1] }, tz: "UTC" });
+  const res = await rawPost({ event: { kind: "quiz", ref: "m1-l1/q1", answers: [1, 0] }, tz: "UTC" });
   expect(res.status).toBe(422);
-  expect(await res.json()).toEqual({ score: 0, total: 1, passed: false });
+  expect(await res.json()).toEqual({ score: 0, total: 2, passed: false });
   const attempts = await db.select().from(quizAttempts);
   expect(attempts).toHaveLength(1);
-  expect(attempts[0]).toMatchObject({ quizRef: "m1-l1/q1", score: 0, total: 1 });
+  expect(attempts[0]).toMatchObject({ quizRef: "m1-l1/q1", score: 0, total: 2 });
   expect(await db.select().from(xpEvents)).toHaveLength(0);
 });
 
 test("correct quiz → 20 XP and recorded as completed", async () => {
-  const a = await post({ kind: "quiz", ref: "m1-l1/q1", answers: [0] });
+  const a = await post({ kind: "quiz", ref: "m1-l1/q1", answers: [0, 1] });
   expect(a.gained).toBe(20);
   expect(a.completed).toContain("m1-l1/q1");
 });

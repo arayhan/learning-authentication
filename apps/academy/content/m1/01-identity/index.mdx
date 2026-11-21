@@ -1,0 +1,54 @@
+<LessonSteps>
+  <Step id="hook" title="Hook">
+    You type a password, the page changes, and the app greets you by name. Two separate questions were just answered, and mixing them up is behind a large share of real-world breaches.
+
+    <Analogy title="The office building">
+      The front desk checks your ID badge and decides you are really Sam. That is authentication. Later, the badge reader on the server room door decides whether Sam may go in. That is authorization.
+    </Analogy>
+  </Step>
+
+  <Step id="concept" title="Concept">
+    Three words get blurred together, so pin them down.
+
+    - **Identity** is the account the system believes you are acting as.
+    - **Authentication** is the proof that the caller owns that identity: a password, a passkey, a code.
+    - **Authorization** is the decision about what that identity may do, made again on every request.
+
+    <Callout type="security">
+      A 401 means "I do not know who you are". A 403 means "I know who you are, and the answer is no". Returning the wrong one hides bugs and leaks information.
+    </Callout>
+
+    Authentication happens once per login. Authorization happens on every request, because roles change and resources differ.
+  </Step>
+
+  <Step id="check" title="Check">
+    Two questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="recap" title="Recap">
+    <RecapCard
+      bullets={[
+        "Authentication proves who you are. Authorization decides what you may do.",
+        "Authenticate once per login, authorize on every request.",
+        "401 means unauthenticated, 403 means authenticated but not allowed.",
+      ]}
+      interview={[
+        {
+          q: "What is the difference between authentication and authorization?",
+          a: "Authentication verifies the caller's identity. Authorization checks that identity against a policy for the resource being requested.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why a logged-in user can still get a 403."
+      rubric={[
+        "Logging in only proves identity",
+        "Each request is checked against permissions for that resource",
+        "403 means known user, not allowed",
+      ]}
+    />
+  </Step>
+</LessonSteps>
