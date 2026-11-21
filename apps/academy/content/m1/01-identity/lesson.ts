@@ -33,6 +33,17 @@ const lesson: LessonMeta = {
           answer: 1,
           why: "The server knew who the caller was (authentication) and decided they may not read that invoice (authorization).",
         },
+        {
+          prompt: "Which of these is an authorization failure rather than an authentication failure?",
+          choices: [
+            "The password does not match the stored hash",
+            "The session cookie has expired",
+            "A signed-in user calls an admin-only endpoint",
+            "The email address is not registered",
+          ],
+          answer: 2,
+          why: "The other three are all failures to prove who the caller is. Only the admin-only call involves a known caller who is not allowed.",
+        },
       ],
     },
   ],

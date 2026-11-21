@@ -1,17 +1,166 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    HTTP has no memory. Every request arrives as a stranger, yet the app somehow remembers you across a hundred page loads without asking for your password again.
+
+    <Analogy title="The coat-check ticket">
+      You hand over your coat once and get a numbered ticket. Showing the ticket gets the coat back, and nobody asks who you are again. But anyone holding the ticket gets the coat, so the number must be impossible to guess.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    After a successful login the server creates a **session**: a record that says "this is Alice, valid until 15:30". It gives the browser a random **session id** to point at that record, and the browser sends the id back on every request.
+
+    The id travels in a **cookie**. The server sets it once with `Set-Cookie`, and from then on the browser attaches it automatically to every request to that site.
+
+    <SequenceFlow flow={flows.sessionCookie} />
+
+    The session id is a **bearer secret**: whoever presents it is treated as Alice. That one fact drives every rule in this lesson. It must be random, protected in storage, protected in transit, and hidden from scripts.
+  </Step>
+
+  <Step id="cookie" title="Anatomy of a cookie">
+    This is the exact header the lab sends back from `/login`:
+
+    ```text
+    Set-Cookie: sid=Xk3q9ZmB1vW8eYrT5uLpA7sD0fGhJcN4iOaE6bQwVyU; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax
+    ```
+
+    Each attribute is a safety feature:
+
+    | Attribute | What it does | Why you want it |
+    |---|---|---|
+    | `HttpOnly` | Hides the cookie from `document.cookie` | An injected script cannot read and ship off the session id |
+    | `Secure` | Sends the cookie over HTTPS only | Stops it travelling in clear text on a network you do not control |
+    | `SameSite=Lax` | Withholds the cookie on cross-site subrequests and POSTs | Cuts off most CSRF (lesson 5) |
+    | `Path=/` | Which URLs get the cookie | Keep it broad for a session |
+    | `Max-Age=3600` | Lifetime in seconds | A cookie that expires, and a session that expires with it |
+    | no `Domain` | A host-only cookie | Subdomains do not receive it |
+
+    <Callout type="warn">
+      The lab leaves out `Secure` only because it runs on plain `http://localhost`. In production `Secure` is required. The strongest form is the `__Host-` prefix, for example `__Host-sid`: the browser then insists on `Secure`, `Path=/` and no `Domain`.
+    </Callout>
+
+    A word on **same-site** versus **same-origin**, because it trips people up. A *site* is the scheme plus the registrable domain, and ports are ignored. So `localhost:3000` (this academy) and `localhost:4101` (the lab) are **same-site**, which is why the lab's cookie flows to and from your browser even though the ports differ.
+  </Step>
+
+  <Step id="server" title="What the server keeps">
+    A good session store follows three rules.
+
+    1. **Random id.** 32 bytes from a cryptographically secure generator, base64url-encoded. OWASP asks for at least 64 bits of entropy, and 256 bits makes guessing hopeless. The id has no meaning: it is a lookup key, not a data container.
+    2. **Store only the hash.** The `sessions` table holds `sha256(id)`, never the id. If the table leaks, the attacker cannot turn rows into cookies.
+    3. **Check the expiry on every lookup.** `expires_at > now()` is part of the query, so an expired session simply does not exist.
+
+    A plain SHA-256 is correct here, unlike for passwords. The token is 256 random bits, so there is nothing to guess and no point in a slow hash.
+
+    <Callout type="security">
+      HttpOnly stops a script from **reading** the cookie. It does not stop an XSS bug from **using** it by sending requests from inside the victim's page. HttpOnly limits the damage, it does not cure the bug.
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Time to watch a session cookie get born. Log in, find the cookie in the Inspector, then use it.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="01"
+      actions={[
+        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Whoami", method: "GET", path: "/me" },
+      ]}
+    />
+
+    Click the `POST /login` row in the Inspector and open the **Cookies** tab: you should see `sid` with `HttpOnly` and `SameSite=Lax`. The response body also contains a `csrfToken`. Lesson 5 puts it to work.
+
+    Then click **Whoami**. You never sent a password or a header: the browser attached the cookie on its own, and `GET /me` came back `200`.
+
+    <Callout type="info">
+      Cookies ignore ports. Switch the selector to TS and click Whoami again. The Go and TS labs share one database, so the session you created in one is valid in the other. It is also a handy proof that the session lives in the database, not in the process.
+    </Callout>
+  </Step>
+
+  <Step id="code" title="Code">
+    Generating the token, hashing it for storage and building the cookie. Notice how little there is to it.
+
+    <CodeTabs
+      go="labs/01-sessions/go/session.go#L18-L37"
+      ts="labs/01-sessions/ts/src/session.ts#L5-L13"
+      notes={{
+        24: "32 random bytes, base64url without padding.",
+        29: "Only the sha256 of the token is ever stored.",
+        36: "HttpOnly and SameSite=Lax, one hour. No Secure here only because the lab runs on http://localhost.",
+        6: "randomBytes(32).toString(\"base64url\"): the same recipe in TypeScript.",
+        13: "Same cookie attributes as the Go lab, byte for byte.",
+      }}
+    />
+
+    Writing and reading the session row. The insert uses the hash, and the lookup checks the expiry in SQL.
+
+    <CodeTabs
+      go="labs/01-sessions/go/session.go#L47-L67"
+      ts="labs/01-sessions/ts/src/store.ts#L68-L81"
+      notes={{
+        53: "hashToken(token): the raw id never reaches the database.",
+        62: "Hash the cookie, match the row, and require expires_at > now().",
+        71: "The same insert in TypeScript, keyed by the hash.",
+        79: "Same lookup: hashed id and an unexpired row.",
+      }}
+    />
+
+    And the handler that uses it. Every protected route starts like this: find the live session, or answer 401.
+
+    <CodeTabs go="labs/01-sessions/go/server.go#L231-L252" ts="labs/01-sessions/ts/src/app.ts#L145-L154" />
+
+    <Callout type="info">
+      The same pattern is what a browser-facing SSO uses: a first-party session cookie on the SSO host, backed by a server-side record. Look at how your **sso-backend** names and flags that cookie, and compare it to the table above.
+    </Callout>
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "A session is a server-side record. The cookie carries only a random id that points to it.",
+        "The id is a bearer secret: 32 random bytes, no meaning, never guessable.",
+        "Cookie flags: HttpOnly, Secure (always in production), SameSite=Lax, a bounded lifetime.",
+        "Store sha256(id), not the id, so a database leak is not a session leak.",
+        "HttpOnly stops theft of the cookie, not abuse through an XSS bug.",
+      ]}
+      interview={[
+        {
+          q: "Why do we need sessions at all?",
+          a: "HTTP is stateless. After one authentication the server issues a random id, remembers who it belongs to, and the browser sends it back automatically so the user does not log in on every request.",
+        },
+        {
+          q: "What do HttpOnly, Secure and SameSite each protect against?",
+          a: "HttpOnly keeps the cookie away from JavaScript, so an XSS bug cannot read it. Secure keeps it off plain HTTP. SameSite limits when it is sent on cross-site requests, which reduces CSRF.",
+        },
+        {
+          q: "Why hash session ids in the database?",
+          a: "The id is equivalent to a password for that session. Storing only its hash means a leaked database or backup cannot be replayed as cookies. A plain SHA-256 is enough because the token is 256 random bits.",
+        },
+        {
+          q: "Session cookie or token in localStorage?",
+          a: "A cookie can be HttpOnly, so XSS cannot read it, but it needs CSRF protection because the browser sends it automatically. localStorage is readable by any script on the page and needs no CSRF protection, so it trades one risk for the other. Module 2 digs into this.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate what exactly is stored in the cookie, what is stored in the database, and why they differ."
+      rubric={[
+        "The cookie holds a random session id and nothing else",
+        "The database holds sha256 of the id, the user and the expiry",
+        "The hash means a database leak cannot be replayed as cookies",
+        "The cookie is a bearer secret, so flags protect it",
+      ]}
+    />
   </Step>
 </LessonSteps>

@@ -8,6 +8,10 @@ import { POST as register } from "../auth/register/route";
 import { GET, POST } from "./route";
 
 const base = "http://localhost:3000/api/progress";
+// Quiz answers come from the registry, so editing the course content never breaks these tests.
+const q1 = () => getLesson("m1-l1")!.quizzes.find((q) => q.id === "q1")!;
+const right = () => q1().questions.map((q) => q.answer);
+const wrong = () => q1().questions.map((q) => (q.answer + 1) % q.choices.length);
 const tokenOf = (res: Response) => /academy_session=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];
 let cookie = "";
 let userId = "";
@@ -55,17 +59,17 @@ test("10 concurrent identical events → xp 10", async () => {
 });
 
 test("wrong quiz answers → 422, attempt stored, xp unchanged", async () => {
-  const res = await rawPost({ event: { kind: "quiz", ref: "m1-l1/q1", answers: [1, 0] }, tz: "UTC" });
+  const res = await rawPost({ event: { kind: "quiz", ref: "m1-l1/q1", answers: wrong() }, tz: "UTC" });
   expect(res.status).toBe(422);
-  expect(await res.json()).toEqual({ score: 0, total: 2, passed: false });
+  expect(await res.json()).toEqual({ score: 0, total: q1().questions.length, passed: false });
   const attempts = await db.select().from(quizAttempts);
   expect(attempts).toHaveLength(1);
-  expect(attempts[0]).toMatchObject({ quizRef: "m1-l1/q1", score: 0, total: 2 });
+  expect(attempts[0]).toMatchObject({ quizRef: "m1-l1/q1", score: 0, total: q1().questions.length });
   expect(await db.select().from(xpEvents)).toHaveLength(0);
 });
 
 test("correct quiz → 20 XP and recorded as completed", async () => {
-  const a = await post({ kind: "quiz", ref: "m1-l1/q1", answers: [0, 1] });
+  const a = await post({ kind: "quiz", ref: "m1-l1/q1", answers: right() });
   expect(a.gained).toBe(20);
   expect(a.completed).toContain("m1-l1/q1");
 });
@@ -94,7 +98,7 @@ test("malformed answers / elapsedMs → 400", async () => {
 test("boss with an unanswered (-1) answer inside the time limit → 422 (not 400), attempt stored as failed", async () => {
   const res = await rawPost({ event: { kind: "boss", ref: "m1-l7/boss", answers: [-1], elapsedMs: 1000 }, tz: "UTC" });
   expect(res.status).toBe(422);
-  expect(await res.json()).toEqual({ score: 0, total: 1, passed: false });
+  expect(await res.json()).toEqual({ score: 0, total: getLesson("m1-l7")!.quizzes[0].questions.length, passed: false });
   const attempts = await db.select().from(quizAttempts);
   expect(attempts).toHaveLength(1);
   expect(attempts[0]).toMatchObject({ quizRef: "m1-l7/boss", score: 0, passed: false });

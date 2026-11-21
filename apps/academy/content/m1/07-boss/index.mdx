@@ -1,6 +1,21 @@
 <LessonSteps>
   <Step id="intro" title="Intro">
-    Content coming soon.
+    Ten questions from the whole module, ten minutes, and you need **8 correct** to pass. There is no feedback until the end, and choices are shuffled each attempt. You can retry as often as you like.
+
+    Skim the cheat sheet first. It is also a good thing to reread before an interview.
+
+    | Topic | One line to remember |
+    |---|---|
+    | authn vs authz | Authn proves who you are (401). Authz decides what you may do (403), on every request. |
+    | Password storage | argon2id (m=19456 KiB, t=2, p=1), unique random salt, PHC string. Rehash at login to raise the cost. |
+    | Password policy | Long passphrases, no composition rules, no forced rotation, check breach lists (NIST 800-63B). |
+    | Session id | 32 random bytes, no meaning, stored as sha256. A bearer secret. |
+    | Cookie flags | `HttpOnly`, `Secure`, `SameSite=Lax`, bounded lifetime, `__Host-` prefix in production. |
+    | Lifecycle | New id at login and at privilege changes. Idle plus absolute timeout. Logout deletes the server record. |
+    | Fixation | Attacker picks the id. Fix: rotate at login, never accept ids you did not issue. |
+    | CSRF | Cookies are sent automatically. Defend with SameSite, a per-session token, an Origin check. CORS is not a defense. |
+    | Rate limiting | Per account and per IP, checked before the password, time-boxed, atomic. 429 + `Retry-After`. |
+    | Enumeration | One generic 401, equal timing via a dummy hash, uniform register and reset responses. |
 
     <BossQuiz id="boss" />
   </Step>

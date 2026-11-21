@@ -10,6 +10,9 @@ import { Quiz } from "@/components/lesson/Quiz";
 import { RecapCard } from "@/components/lesson/RecapCard";
 import { Shot } from "@/components/lesson/Shot";
 import { Step } from "@/components/lesson/Step";
+import { CsrfSim } from "@/components/playground/CsrfSim";
+import { FixationAttack } from "@/components/playground/FixationAttack";
+import { HashPlayground } from "@/components/playground/HashPlayground";
 import { LabConsole } from "@/components/playground/LabConsole";
 import { LabTasks } from "@/components/playground/LabTasks";
 
@@ -44,6 +47,9 @@ const components: MDXComponents = {
   SequenceFlow,
   LabTasks,
   LabConsole,
+  HashPlayground,
+  CsrfSim,
+  FixationAttack,
 };
 
 export function useMDXComponents(): MDXComponents {

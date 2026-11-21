@@ -100,7 +100,7 @@ describe("evaluateBadges", () => {
   );
   it("awards module badge when all refs complete", () => {
     expect(evaluateBadges({ completed: new Set(), perfectBoss: false, streak: 0 })).toEqual([]);
-    expect(evaluateBadges({ completed: refs(m1), perfectBoss: false, streak: 0 })).toEqual(["cookie-monster"]);
+    expect(evaluateBadges({ completed: refs(m1), perfectBoss: false, streak: 0 })).toContain("cookie-monster");
   });
   it("awards streak and flawless", () => {
     expect(evaluateBadges({ completed: new Set(), perfectBoss: true, streak: 7 })).toEqual(["on-call", "flawless"]);

@@ -5,12 +5,30 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProgressProvider } from "@/components/game/ProgressProvider";
 import { getLesson } from "@/lib/course/registry";
-import type { XpEvent } from "@/lib/course/types";
+import type { LessonMeta, XpEvent } from "@/lib/course/types";
 import { BossQuiz } from "./BossQuiz";
 import { LessonProvider } from "./LessonProvider";
 import { LessonSteps } from "./LessonSteps";
 import { Quiz } from "./Quiz";
 import { Step } from "./Step";
+
+// The BossQuiz tests need a tiny, known exam (choices A/B, answer index 0). The real m1-l7 content is swapped out here
+// so these engine tests do not depend on, or break with, what the course actually asks.
+const bossFixture = vi.hoisted(() => ({
+  id: "m1-l7",
+  module: "m1",
+  slug: "boss",
+  title: "Boss",
+  minutes: 1,
+  steps: [{ id: "intro", title: "Intro" }],
+  quizzes: [{ id: "boss", boss: { seconds: 600, passRatio: 0.8 }, questions: [{ prompt: "Placeholder question", choices: ["A", "B"], answer: 0, why: "Placeholder." }] }],
+  labTasks: [],
+  attacks: [],
+}));
+vi.mock("@/lib/course/registry", async (orig) => {
+  const actual = await orig<typeof import("@/lib/course/registry")>();
+  return { ...actual, getLesson: (id: string) => (id === "m1-l7" ? (bossFixture as LessonMeta) : actual.getLesson(id)) };
+});
 
 afterEach(() => {
   cleanup();
@@ -94,7 +112,7 @@ describe("lesson engine", () => {
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
     // a failing attempt keeps it blocked and offers a retry
     await answerAll(q1.questions.map((q) => (q.answer + 1) % q.choices.length));
-    expect(await screen.findByText(/0 of 2/)).toBeInTheDocument();
+    expect(await screen.findByText(new RegExp(`0 of ${q1.questions.length}`))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
     await answerAll(q1.questions.map((q) => q.answer));

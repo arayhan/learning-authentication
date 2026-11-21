@@ -4,8 +4,8 @@ import { flows } from "@/content/flows";
   <Step id="hook" title="Hook">
     You type a password, the page changes, and the app greets you by name. Two separate questions were just answered, and mixing them up is behind a large share of real-world breaches.
 
-    <Analogy title="The office building">
-      The front desk checks your ID badge and decides you are really Sam. That is authentication. Later, the badge reader on the server room door decides whether Sam may go in. That is authorization.
+    <Analogy title="The hotel">
+      At check-in the desk looks at your passport and decides you really are Sam. That is authentication. Your key card then opens only the floors and rooms Sam booked. That is authorization.
     </Analogy>
   </Step>
 
@@ -13,22 +13,33 @@ import { flows } from "@/content/flows";
     Three words get blurred together, so pin them down.
 
     - **Identity** is the account the system believes you are acting as.
-    - **Authentication** is the proof that the caller owns that identity: a password, a passkey, a code.
-    - **Authorization** is the decision about what that identity may do, made again on every request.
+    - **Authentication** (authn) is the proof that the caller owns that identity: a password, a passkey, a code.
+    - **Authorization** (authz) is the decision about what that identity may do, made again on every request.
 
-    Here is the whole round trip in one login. Step through it, and click an arrow with a dotted label to read the raw message.
+    Here is the whole round trip. Step through it, and click an arrow with a dotted label to read the raw message.
 
-    <SequenceFlow flow={flows.demo} />
+    <SequenceFlow flow={flows.whoIsWho} />
+
+    Authentication happens once per login. Authorization happens on every request, because roles change and every resource has a different owner.
+
+    | | Authentication | Authorization |
+    |---|---|---|
+    | Question | Who are you? | May you do this? |
+    | Input | Password, passkey, code | Identity plus a rule or policy |
+    | Frequency | At login | Every request |
+    | Failure | `401 Unauthorized` | `403 Forbidden` |
 
     <Callout type="security">
       A 401 means "I do not know who you are". A 403 means "I know who you are, and the answer is no". Returning the wrong one hides bugs and leaks information.
     </Callout>
 
-    Authentication happens once per login. Authorization happens on every request, because roles change and resources differ.
+    <Callout type="info">
+      In a modular monolith with SSO, the split is physical. Your **sso-backend** answers "who is this?". What that person may do inside platform A, B or C is a separate question each platform (or `core-api`) has to answer itself. A valid SSO login never means "allowed everywhere".
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Two questions. Every answer has to be right, but you can try as often as you like.
+    Three questions. Every answer has to be right, but you can try as often as you like.
 
     <Quiz id="q1" gate />
   </Step>
@@ -39,11 +50,20 @@ import { flows } from "@/content/flows";
         "Authentication proves who you are. Authorization decides what you may do.",
         "Authenticate once per login, authorize on every request.",
         "401 means unauthenticated, 403 means authenticated but not allowed.",
+        "Being logged in is never a permission by itself.",
       ]}
       interview={[
         {
           q: "What is the difference between authentication and authorization?",
-          a: "Authentication verifies the caller's identity. Authorization checks that identity against a policy for the resource being requested.",
+          a: "Authentication verifies the caller's identity. Authorization checks that identity against a policy for the resource being requested. They run at different times and fail with different status codes.",
+        },
+        {
+          q: "When do you return 401 and when 403?",
+          a: "401 when the request has no valid credentials, so the server does not know who is asking. 403 when the caller is known but the policy denies the action.",
+        },
+        {
+          q: "A user is logged in. Why can you still not trust a role value sent by the browser?",
+          a: "Authentication only established who they are. Permissions must come from the server's own data on every request, never from a field the client controls.",
         },
       ]}
     />

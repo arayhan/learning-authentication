@@ -1,17 +1,188 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    A session is only as safe as the moments you create it, change it and destroy it. Most real session bugs are not in the cookie flags. They are in the timing.
+
+    <Analogy title="New locks on move-in day">
+      When you move into a flat you change the locks, because you cannot know who kept a copy of the old key. A session id is a key, and logging in is move-in day: the server should hand you a new one.
+    </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Content coming soon.
+  <Step id="lifecycle" title="Birth to death">
+    A session has a life, and each stage has a rule.
+
+    | Stage | Rule |
+    |---|---|
+    | Create | After authentication, with a fresh random id |
+    | Use | Look the id up on every request; check the expiry in the database |
+    | Rotate | New id at login and at every privilege change: password change, MFA step-up, role change |
+    | Expire | An **idle** timeout and an **absolute** timeout, enforced on the server |
+    | Destroy | Logout deletes the server-side record, then clears the cookie |
+
+    **Idle** timeout ends a session after a period without use. **Absolute** timeout ends it no matter what, so a stolen session cannot live forever. OWASP's Session Management cheat sheet suggests 2 to 5 minutes idle for high-value apps and 15 to 30 minutes for low-risk ones, and you pick the absolute limit from your risk.
+
+    The lab keeps it small: one hour, absolute, stored in the database as `expires_at`. The cookie's `Max-Age` is only a hint to the browser. The server never trusts it.
+
+    <Callout type="security">
+      Changing a password should also **destroy every other session** of that user and give the current device a new one. If the reason for the change is "someone else had my password", their sessions must die too.
+    </Callout>
+  </Step>
+
+  <Step id="rotation" title="Rotate on login">
+    Here is the secure login, step by step. The server deletes whatever id the client arrived with, creates a new one, and sets it.
+
+    <SequenceFlow flow={flows.sessionRotation} />
+
+    Why bother? Because the id the browser held **before** login was created while nobody was authenticated, and nobody protected it. Anyone who knew it would be handed a logged-in session for free, if login simply kept it. Rotation closes that door.
+  </Step>
+
+  <Step id="session-fixation" title="Session fixation">
+    **Session fixation** is the attack that rotation exists to stop. It turns the usual theft around: the attacker does not steal the victim's id, they **choose** it.
+
+    1. The attacker obtains or invents a session id.
+    2. They get it into the victim's browser. Real routes: a session id accepted from the URL, a cookie planted from a sibling subdomain or by an XSS bug, or a network attacker on plain HTTP.
+    3. The victim logs in. A vulnerable server keeps the id and attaches the victim's account to it.
+    4. The attacker sends requests with the id they always knew.
+
+    <SequenceFlow flow={flows.fixation} />
+
+    The fixes are simple and cheap:
+
+    - **Always issue a new id at login** and delete the old one.
+    - **Never accept a session id the server did not issue.**
+    - Keep ids out of URLs, and use `Secure` and `HttpOnly` cookies.
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Log in, use the session, then log out and prove the session is really gone.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="01"
+      actions={[
+        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Whoami", method: "GET", path: "/me" },
+        { label: "Log out", method: "POST", path: "/logout", headers: { "X-CSRF-Token": "{{csrfToken}}" } },
+        { label: "Whoami again", method: "GET", path: "/me" },
+      ]}
+    />
+
+    Two things to notice:
+
+    - **Log out** needs the CSRF token from your login response, because logging someone out is a state change too. The console fills it in from the last login. Without a token you would get `403`.
+    - After logging out, **Whoami again** returns `401`. The server deleted the session, so even a copied cookie is dead.
+
+    Try Log in twice in a row and watch the `sid` change in the Inspector's Cookies tab. That is rotation.
+  </Step>
+
+  <Step id="code" title="Code">
+    The login handler after the password check passes. It reads the incoming `sid`, deletes that session, creates a new one and sets the cookie.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L208-L229"
+      ts="labs/01-sessions/ts/src/app.ts#L132-L142"
+      notes={{
+        214: "The vulnerable branch: with the X-Lab-Mode header the incoming id is kept. We will exploit it in a moment.",
+        217: "The secure branch: delete whatever session the client presented.",
+        227: "A new, random id goes out in Set-Cookie.",
+        134: "The vulnerable branch, in TypeScript.",
+        137: "Secure: delete the session named by the incoming cookie.",
+        141: "Set-Cookie with the new id.",
+      }}
+    />
+
+    And logout, which requires the CSRF token, deletes the row and clears the cookie.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L254-L270"
+      ts="labs/01-sessions/ts/src/app.ts#L156-L163"
+      notes={{
+        259: "A constant-time comparison with the session's CSRF token.",
+        264: "The server-side record is deleted. This is the part that matters.",
+        268: "clearCookie sends Max-Age=-1, so the browser drops its copy too.",
+        159: "The same CSRF check before anything is deleted.",
+        160: "Delete the server-side session.",
+        161: "Clear the cookie.",
+      }}
+    />
+  </Step>
+
+  <Step id="breakit" title="Break it">
+    Time to exploit the very bug you just read. This runs the real fixation attack against the lab, twice: once with the vulnerable branch switched on, once secure.
+
+    Click **Run vulnerable**, then **Run secure**. The page registers a victim, **plants** a session id, has the victim log in, and finally has the attacker replay that id.
+
+    <FixationAttack />
+
+    You should see two different answers to the same attack:
+
+    - **Vulnerable: 200.** The login kept the attacker's id, so `GET /me` with it returns the victim's email.
+    - **Secure: 401.** The login rotated the id and deleted the old one, so the planted id is worthless.
+
+    Open the Inspector and read the requests of each run. The only difference between them is one header on one request.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L213-L221"
+      ts="labs/01-sessions/ts/src/app.ts#L133-L138"
+      notes={{
+        214: "VULNERABLE: the attacker-chosen id becomes the authenticated session.",
+        216: "Secure: remember the old id and delete it.",
+        134: "VULNERABLE: reuse the incoming id.",
+        136: "Secure: delete the incoming session.",
+      }}
+    />
+
+    <Callout type="info">
+      Browsers do not let a script set a cookie for another site. The lab's `/__attack/plant-sid` helper stands in for the real planting channel (an XSS bug, a sibling subdomain, a poisoned link), and it only exists when you send `X-Lab-Mode: vulnerable`.
+    </Callout>
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "A session has a lifecycle: create, use, rotate, expire, destroy, and the server enforces every stage.",
+        "Issue a new session id at login and at every privilege change, and delete the old one.",
+        "Session fixation: the attacker chooses the id and waits for the victim to log in under it.",
+        "Use an idle timeout plus an absolute timeout, both enforced on the server.",
+        "Logout must delete the server-side session, not just the cookie.",
+      ]}
+      interview={[
+        {
+          q: "What is session fixation, and how do you prevent it?",
+          a: "The attacker plants a known session id in the victim's browser. If the server keeps that id after login, the attacker now holds an authenticated session. Prevent it by issuing a fresh id at login, deleting the old one, and never accepting ids the server did not generate.",
+        },
+        {
+          q: "When should you regenerate the session id?",
+          a: "At login, and on any privilege or security-context change: password change, MFA step-up, role elevation. The old id must stop working.",
+        },
+        {
+          q: "What is the difference between an idle and an absolute timeout?",
+          a: "Idle ends a session after inactivity. Absolute ends it after a fixed lifetime regardless of activity. Together they bound how long a stolen or forgotten session stays useful.",
+        },
+        {
+          q: "Why is clearing the cookie not a real logout?",
+          a: "Anyone who copied the cookie can still use it until the server forgets the session. A real logout deletes the server-side record.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Walk through a fixation attack, then explain which single server behavior makes it fail."
+      rubric={[
+        "The attacker chooses the session id and plants it in the victim's browser",
+        "The victim authenticates under that id",
+        "A vulnerable server keeps the id, so the attacker's copy is now logged in",
+        "Issuing a new id at login (and deleting the old) makes the planted id worthless",
+      ]}
+    />
   </Step>
 </LessonSteps>

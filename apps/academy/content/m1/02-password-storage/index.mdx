@@ -1,17 +1,168 @@
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    Sooner or later, a database leaks. The question that matters is what the attacker finds in the `users` table: passwords they can type into other sites, or something close to useless.
+
+    <Analogy title="The fingerprint">
+      A good lock keeps a scan of your fingerprint, never a copy of your finger. It can tell that a finger matches, but nobody can rebuild the finger from the scan. Password storage works the same way: keep something that can confirm a password, never the password.
+    </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Content coming soon.
+  <Step id="hash" title="Hash, don't store">
+    Three ways to keep a password, from worst to best.
+
+    1. **Plaintext.** One leak exposes every account, and every other site where users reused the password.
+    2. **Encryption.** Better looking, same outcome. The app must be able to decrypt, so the key lives where the app runs, and an attacker who got the database often gets the key too.
+    3. **Hashing.** A one-way function. The server stores the hash, and at login it hashes the attempt and compares. There is nothing to decrypt.
+
+    But "hashed" is not enough. MD5, SHA-1 and SHA-256 are designed to be **fast**. That is great for checking a download and terrible here, because a single GPU can test billions of guesses per second against a stolen hash, and most real passwords fall to a dictionary in minutes.
+
+    <Callout type="security">
+      Never invent your own scheme, and never use a general-purpose hash (MD5, SHA-1, SHA-256, even SHA-3) on its own for passwords. Use a password hashing function: argon2id, scrypt, bcrypt or PBKDF2.
+    </Callout>
+  </Step>
+
+  <Step id="salt" title="Salt and cost">
+    Two ingredients turn a hash into a password hash.
+
+    A **salt** is a random value, unique per password, stored right next to the hash. It is not secret. It makes every hash different, so one precomputed table cannot crack all users, and two people with the same password no longer look the same.
+
+    A **cost** makes each guess expensive on purpose. Argon2id is also **memory-hard**: every guess needs a large block of RAM, which takes away the advantage of GPUs and custom chips.
+
+    | Algorithm | Recommended setting (OWASP Password Storage cheat sheet) | Notes |
+    |---|---|---|
+    | argon2id | m=19456 KiB (19 MiB), t=2, p=1 | First choice. The lab uses exactly this. |
+    | scrypt | N=2^17, r=8, p=1 | Memory-hard too. |
+    | bcrypt | cost 10 or more | Truncates input at 72 bytes. Fine for legacy systems. |
+    | PBKDF2-HMAC-SHA256 | 600,000 iterations or more | For FIPS-bound systems. Not memory-hard. |
+
+    A hash is usually stored as one self-describing **PHC string**, so the verifier never has to guess the settings:
+
+    ```text
+    $argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo
+    ```
+
+    Read it left to right: the algorithm, the version, the memory (KiB), time and parallelism settings, then the salt and the hash, both in unpadded base64.
+
+    Because the parameters travel with the hash, you can raise the cost later and rehash each user the next time they log in.
+
+    **What about the password rules themselves?** NIST SP 800-63B says: allow long passphrases (at least 64 characters), accept spaces and Unicode, do not force "one uppercase, one symbol" composition rules, do not force periodic rotation, and reject passwords found in breach lists or common-password lists. The lab accepts 8 to 128 characters. The latest revision raises the single-factor minimum to 15, so treat the lab as a minimum, not a recommendation.
+  </Step>
+
+  <Step id="playground" title="Playground">
+    Feel the difference. This runs in your browser with Web Crypto, so no password ever leaves the page.
+
+    1. Type a password and compare the two **salts**: same password, completely different hashes.
+    2. Look at the SHA-256 row: it never changes speed.
+    3. Drag **Iterations** to the right and watch the PBKDF2 time grow. That growth is the point.
+
+    <HashPlayground />
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Now do it for real against the lab server. Register an account, then log in, and watch both requests in the Inspector.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="01"
+      actions={[
+        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Register bob", method: "POST", path: "/register", body: { email: "bob@example.com", password: "correct horse battery" } },
+        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Log in as bob", method: "POST", path: "/login", body: { email: "bob@example.com", password: "correct horse battery" } },
+      ]}
+    />
+
+    Open the `POST /register` row in the Inspector. The request body shows `"password":"[redacted]"`: the lab's tracer scrubs passwords so they never show up in logs. The response is a `201` with an id and email, and no hash.
+
+    Check the duration column too. Register and login are the slowest requests in the list, because argon2id is doing its job.
+
+    <Callout type="info">
+      A `409` means the address is already registered, which is fine for this lab. Credentials are in the Postgres `lab01` schema, shared by the Go and TS implementations, so an account created through one logs in through the other.
+    </Callout>
+  </Step>
+
+  <Step id="code" title="Code">
+    Here is the real code the lab runs. First, hashing: a fresh 16-byte salt, argon2id with the parameters from the table, and a PHC string as output.
+
+    <CodeTabs
+      go="labs/01-sessions/go/password.go#L13-L33"
+      ts="labs/01-sessions/ts/src/password.ts#L3-L7"
+      notes={{
+        26: "A new random 16-byte salt for every password.",
+        30: "argon2id with m=19456 KiB, t=2, p=1 and a 32-byte output.",
+        5: "The same parameters as the Go lab: the two hashes are interchangeable.",
+      }}
+    />
+
+    Then verifying. The parameters come from the stored string, so old hashes keep working after you change the defaults. The comparison is constant-time, and anything malformed simply fails to verify.
+
+    <CodeTabs
+      go="labs/01-sessions/go/password.go#L35-L58"
+      ts="labs/01-sessions/ts/src/password.ts#L9-L16"
+      notes={{
+        56: "Recompute with the salt and parameters read from the stored PHC string.",
+        57: "Constant-time comparison, so timing reveals nothing about how many bytes matched.",
+        12: "The library reads the parameters from the PHC string and compares in constant time.",
+      }}
+    />
+
+    And the register handler that ties it together:
+
+    <CodeTabs go="labs/01-sessions/go/server.go#L151-L177" ts="labs/01-sessions/ts/src/app.ts#L98-L110" />
+
+    <Callout type="info">
+      Worth checking in your own **sso-backend**: which algorithm and cost does it store, and does a successful login rehash an old hash with the current settings? That one habit is how you raise the cost later without a password reset.
+    </Callout>
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Store a salted, slow, one-way hash. Never plaintext, never reversible encryption.",
+        "SHA-256 is fast by design, which is exactly wrong for passwords.",
+        "The salt is unique and public. The cost parameters make each guess expensive.",
+        "argon2id (m=19456 KiB, t=2, p=1) is the current first choice; the PHC string carries its own settings.",
+        "NIST 800-63B: long passphrases, no composition rules, no forced rotation, check against breach lists.",
+      ]}
+      interview={[
+        {
+          q: "How should you store user passwords?",
+          a: "With a password hashing function such as argon2id, using a unique random salt per password and cost parameters tuned to your hardware, saved as a PHC string. Never plaintext or reversible encryption.",
+        },
+        {
+          q: "Why can't you just use SHA-256, even with a salt?",
+          a: "SHA-256 is extremely fast, so an attacker with a stolen database can test enormous numbers of guesses per second. A password hash must be deliberately slow, and argon2id also needs a lot of memory per guess.",
+        },
+        {
+          q: "Does the salt have to be secret?",
+          a: "No. It is stored next to the hash. Its job is uniqueness: it defeats precomputed tables and stops identical passwords from producing identical hashes.",
+        },
+        {
+          q: "How do you increase the work factor on a live system?",
+          a: "Raise the parameters for new hashes. When a user logs in with the right password, rehash with the new parameters and store the new PHC string. Each hash carries its own settings, so old ones keep verifying until then.",
+        },
+        {
+          q: "bcrypt or argon2id?",
+          a: "argon2id is the first choice because it is memory-hard. bcrypt is still acceptable at cost 10 or higher, but it truncates input at 72 bytes and is not memory-hard.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Your database was just leaked. Explain to a non-technical manager what the attacker has, and why password hashing matters."
+      rubric={[
+        "They have hashes and salts, not passwords",
+        "Fast hashes can be guessed at billions per second, slow ones cannot",
+        "Salts stop one precomputed table from cracking everyone",
+        "Weak passwords still fall first, so strong rules and breach checks matter",
+      ]}
+    />
   </Step>
 </LessonSteps>

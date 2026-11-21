@@ -316,6 +316,39 @@ describe("LabConsole", () => {
     expect(labCalls()[1][1].headers).not.toHaveProperty("X-Lab-Mode");
   });
 
+  it("replaces {{csrfToken}} in headers and body with the token from the latest login response", async () => {
+    const f = vi.fn(async (url: string) =>
+      url.endsWith("/login")
+        ? new Response('{"csrfToken":"tok-123"}', { status: 200, headers: { "content-type": "application/json" } })
+        : new Response('{"ok":true}', { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", f);
+    wrap(
+      <LabConsole
+        lab="01"
+        actions={[
+          { label: "Login", method: "POST", path: "/login", body: { email: "a" } },
+          { label: "Transfer", method: "POST", path: "/transfer", headers: { "X-CSRF-Token": "{{csrfToken}}" }, body: { to: "bob", note: "{{csrfToken}}" } },
+          { label: "Whoami", method: "GET", path: "/me" },
+        ]}
+      />,
+    );
+    const labCalls = () => (f.mock.calls as unknown as [string, RequestInit][]).filter(([u]) => u.startsWith("http://localhost"));
+    // before any login: empty token and a hint
+    expect(screen.getByText("Log in first to get a CSRF token")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Transfer/ }));
+    expect(labCalls()[0][1].headers).toMatchObject({ "X-CSRF-Token": "" });
+
+    await userEvent.click(screen.getByRole("button", { name: /Login/ }));
+    await screen.findByText(/tok-123/);
+    expect(screen.queryByText("Log in first to get a CSRF token")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Whoami/ })); // a response without csrfToken keeps the token
+    await userEvent.click(screen.getByRole("button", { name: /Transfer/ }));
+    const init = labCalls()[3][1];
+    expect(init.headers).toMatchObject({ "X-CSRF-Token": "tok-123" });
+    expect(init.body).toBe('{"to":"bob","note":"tok-123"}');
+  });
+
   it("shows the start command instead of throwing when the lab is offline", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
     wrap(<LabConsole lab="02" actions={[{ label: "JWKS", method: "GET", path: "/jwks.json" }]} />);

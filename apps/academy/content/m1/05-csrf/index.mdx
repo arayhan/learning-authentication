@@ -1,17 +1,179 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    You are signed in to your bank in one tab. In another tab you open a page that promises a free cruise. Nothing visibly happens, and your balance drops anyway.
+
+    <Analogy title="The forged signature">
+      Someone slips a letter in front of your bank, written by them, carrying a signature that looks like yours. The bank sees a familiar signature and pays out. It never asks whether you actually wrote the letter.
+    </Analogy>
   </Step>
 
-  <Step id="concept" title="Concept">
-    Content coming soon.
+  <Step id="attack" title="The attack">
+    **Cross-site request forgery (CSRF)** makes a victim's browser send a request they never intended, while it carries their cookie.
+
+    It works because of one browser habit: cookies are **ambient credentials**. The browser attaches the cookies for `bank.example` to every request going to `bank.example`, no matter which page caused the request. The bank cannot tell a click on its own page from a form hidden on another site.
+
+    <SequenceFlow flow={flows.csrfAttack} />
+
+    Three ingredients are needed. Remove any one and the attack fails:
+
+    1. The app authenticates with a **cookie** the browser sends by itself.
+    2. There is a **state-changing request** (transfer money, change email).
+    3. The attacker can **predict every parameter** of that request.
+
+    Note what the attacker does **not** get: the response. CSRF is blind. It can cause actions, not read data, which is why it targets state changes.
+  </Step>
+
+  <Step id="defenses" title="Defenses">
+    Defenses stack, and each one blocks the attack at a different point.
+
+    | Defense | How it stops the forged request | Watch out for |
+    |---|---|---|
+    | `SameSite=Lax` cookie | The browser does not send the cookie on cross-site POSTs or subrequests | Subdomains count as the same site. Lax still sends cookies on cross-site top-level **GET** navigations, so never change state on GET. |
+    | **CSRF token** (synchronizer) | A per-session secret must come back in a header or field. Attackers cannot read it, so they cannot send it. | Must be unpredictable, tied to the session, and compared in constant time |
+    | **Origin check** | Reject unsafe requests whose `Origin` (or `Sec-Fetch-Site`) is not your own site | Do not rely on `Referer` alone. Be strict about which origins are allowed |
+    | Custom header + CORS | A JSON `fetch` with a custom header triggers a CORS preflight that other origins fail | A weak fallback. Do not rely on it as your only defense |
+
+    The lab uses the **synchronizer token** pattern. Each session gets its own random CSRF token (you saw it in the `/login` response body). The browser's own JavaScript sends it back in an `X-CSRF-Token` header on every request that changes state, and the server compares it with the one stored for that session.
+
+    <Callout type="security">
+      **CORS is not a CSRF defense.** CORS decides who may *read* a cross-origin response. A cross-site form POST is a "simple request": it is still sent, with cookies, and the damage happens whether or not anyone reads the reply.
+    </Callout>
+
+    <Callout type="warn">
+      If your own subdomains are not all trusted, or an attacker can run script on one of them, `SameSite` will not separate them from your app: same registrable domain means same site. The token and Origin check carry the load. And an **XSS** bug on your own origin defeats every CSRF defense, because the attacker's script can read the token like any other script.
+    </Callout>
+
+    <Callout type="info">
+      Worth asking of your own setup: do **sso-frontend** and **sso-backend** live on sibling subdomains of one domain, and which cookies does the browser send between them? If so, `SameSite` alone does not isolate them from other things on that domain, so check that state-changing endpoints verify a token or `Origin`.
+    </Callout>
+  </Step>
+
+  <Step id="simulate" title="Simulator">
+    Run the attack yourself. The evil page on the left submits a hidden form to the bank on the right. Switch defenses on **one at a time** and send the forged request.
+
+    1. Send it with every defense off: the transfer goes through.
+    2. Turn on **SameSite=Lax** alone and send again.
+    3. Repeat for **CSRF token** alone, then **Origin check** alone.
+
+    <CsrfSim />
+
+    This is a simulation, so nothing leaves the page. The next steps do the same thing for real against the lab.
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Two requests, one cookie, two different outcomes. Log in, then try the transfer without and with the CSRF token.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="01"
+      actions={[
+        { label: "Register alice", method: "POST", path: "/register", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Transfer, no token", method: "POST", path: "/transfer", body: { to: "bob@example.com", amount: 25 } },
+        { label: "Transfer, with token", method: "POST", path: "/transfer", headers: { "X-CSRF-Token": "{{csrfToken}}" }, body: { to: "bob@example.com", amount: 25 } },
+      ]}
+    />
+
+    The first transfer carries your valid session cookie and still gets `403 {"error":"csrf"}`. That is what a forged request looks like to a protected server: right cookie, missing secret.
+
+    The second one adds `X-CSRF-Token`, taken from the response to `/login`, and returns `200`. Only code running in the bank's own page could have known that value.
+
+    <Callout type="info">
+      A subtle point about the lab: `/transfer` only accepts `application/json`, and a cross-site HTML form cannot send that type. So a plain form attack would already fail on a parsing error. That is an accident of the API, not a defense to count on. Parsers get lenient and endpoints get added, so keep the token.
+    </Callout>
+  </Step>
+
+  <Step id="code" title="Code">
+    The transfer handler. It finds the session, then compares the header with the token stored for that session, before it reads the body.
+
+    <CodeTabs
+      go="labs/01-sessions/go/server.go#L272-L292"
+      ts="labs/01-sessions/ts/src/app.ts#L165-L177"
+      notes={{
+        277: "The CSRF check. The vulnerable flag skips it, so we can show the attack succeeding.",
+        291: "A demo response: the lab keeps no balances.",
+        169: "The same check in TypeScript, with the same vulnerable escape hatch.",
+      }}
+    />
+
+    The comparison is constant-time, so response timing cannot be used to guess the token byte by byte.
+
+    <CodeTabs
+      go="labs/01-sessions/go/session.go#L43"
+      ts="labs/01-sessions/ts/src/session.ts#L16-L20"
+      notes={{
+        19: "A length check first (lengths are not secret), then timingSafeEqual.",
+      }}
+    />
+  </Step>
+
+  <Step id="breakit" title="Break it">
+    Now play the attacker's side and see what happens when the check is gone. The button below sends `X-Lab-Mode: vulnerable`, which makes the lab skip the CSRF check. It is a stand-in for a server that forgot it.
+
+    <LabConsole
+      lab="01"
+      actions={[
+        { label: "Log in as alice", method: "POST", path: "/login", body: { email: "alice@example.com", password: "correct horse battery" } },
+        { label: "Forged transfer, no token", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 }, vulnerable: true },
+        { label: "Transfer, no token (secure)", method: "POST", path: "/transfer", body: { to: "mallory@example.com", amount: 500 } },
+      ]}
+    />
+
+    With the check skipped, the forged request returns `200`: the cookie alone was enough. Run the secure version of the same request and it returns `403`.
+
+    The point of the exercise: the **only** thing separating "attacker moves money" from "attacker is refused" is one server-side comparison.
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "CSRF abuses cookies being sent automatically: the victim's browser makes the request, with their cookie.",
+        "It needs cookie auth, a state-changing request and predictable parameters.",
+        "Defenses stack: SameSite=Lax, a per-session CSRF token, an Origin check.",
+        "CORS is not a CSRF defense, and never change state on GET.",
+        "XSS on your own origin defeats CSRF protection entirely.",
+      ]}
+      interview={[
+        {
+          q: "What is CSRF and why does it work?",
+          a: "An attacker's page makes the victim's browser send a request to a site where the victim is logged in. Browsers attach cookies for the target site automatically, so the request is authenticated even though the user never intended it.",
+        },
+        {
+          q: "How does a CSRF token stop the attack?",
+          a: "The server gives each session a secret value and requires it back on every state-changing request, in a header or field. A cross-site page can send the request but cannot read the token because of the same-origin policy, so the forged request is rejected.",
+        },
+        {
+          q: "SameSite=Lax versus Strict?",
+          a: "Lax withholds the cookie on cross-site subrequests and POSTs but still sends it on top-level GET navigations, such as clicking a link. Strict withholds it on every cross-site request, which breaks inbound links by making users look logged out.",
+        },
+        {
+          q: "Does SameSite make CSRF tokens unnecessary?",
+          a: "No, treat it as defense in depth. It covers one browser behavior only: it does not separate subdomains, and older or unusual clients may not enforce it. Keep a token or an Origin check on state-changing endpoints.",
+        },
+        {
+          q: "Does CORS protect against CSRF?",
+          a: "No. CORS restricts who can read cross-origin responses. Simple cross-site requests are still sent, with cookies.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why a request can be forged even though the attacker never learns the victim's cookie."
+      rubric={[
+        "The browser attaches cookies automatically based on the destination",
+        "The attacker only has to make the victim's browser send the request",
+        "A per-session token is unreadable to the attacker, so the forged request lacks it",
+        "SameSite and an Origin check block it at other points",
+      ]}
+    />
   </Step>
 </LessonSteps>

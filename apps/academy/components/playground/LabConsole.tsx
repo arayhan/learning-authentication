@@ -20,27 +20,48 @@ export type ConsoleAction = {
 
 type Result = { label: string; status: number; headers: [string, string][]; body: string } | "offline";
 
-const KEY_HEADERS = ["content-type", "location", "set-cookie", "www-authenticate", "cache-control"];
+const KEY_HEADERS = ["content-type", "location", "set-cookie", "www-authenticate", "cache-control", "retry-after"];
+const PLACEHOLDER = "{{csrfToken}}";
+const uses = (a: ConsoleAction) => JSON.stringify([a.headers, a.body]).includes(PLACEHOLDER);
 
-/** Fires requests at the selected lab implementation and shows the response inline. */
+/** The `csrfToken` field of a JSON response body, if it has one. */
+function csrfOf(text: string): string | null {
+  try {
+    const v = JSON.parse(text) as { csrfToken?: unknown };
+    return typeof v?.csrfToken === "string" ? v.csrfToken : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fires requests at the selected lab implementation and shows the response inline. String values in an action's
+ * `headers` and `body` may contain {{csrfToken}}: it is replaced by the last `csrfToken` this console received from
+ * the selected implementation (a later response without one keeps it), or by "" before any login.
+ */
 export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleAction[] }) {
   const [impl] = useLabImpl();
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
+  const [csrf, setCsrf] = useState<{ impl: string; token: string } | null>(null);
+  const token = csrf?.impl === impl ? csrf.token : "";
+  const sub = (v: string) => v.replaceAll(PLACEHOLDER, token);
 
   const run = async (a: ConsoleAction) => {
     setBusy(true);
     try {
-      const headers: Record<string, string> = { ...a.headers };
+      const headers: Record<string, string> = Object.fromEntries(Object.entries(a.headers ?? {}).map(([k, v]) => [k, sub(v)]));
       if (a.body !== undefined) headers["Content-Type"] ??= "application/json";
       if (a.vulnerable) headers["X-Lab-Mode"] = "vulnerable";
       const res = await fetch(`${labBase(lab, impl)}${a.path}`, {
         method: a.method,
         headers,
-        body: a.body === undefined ? undefined : typeof a.body === "string" ? a.body : JSON.stringify(a.body),
+        body: a.body === undefined ? undefined : sub(typeof a.body === "string" ? a.body : JSON.stringify(a.body)),
         credentials: "include",
       });
       const text = await res.text();
+      const fresh = csrfOf(text);
+      if (fresh) setCsrf({ impl, token: fresh });
       setResult({
         label: a.label,
         status: res.status,
@@ -73,6 +94,7 @@ export function LabConsole({ lab, actions }: { lab: LabId; actions: ConsoleActio
           </Button>
         ))}
       </div>
+      {!token && actions.some(uses) && <p className="text-xs text-muted-foreground">Log in first to get a CSRF token</p>}
       {result === "offline" && <OfflineCard lab={lab} impl={impl} retrying={false} />}
       {result && result !== "offline" && (
         <div aria-live="polite" className="space-y-2 rounded-md border bg-muted/30 p-3 font-mono text-xs">
