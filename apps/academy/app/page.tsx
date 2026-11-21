@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/game/Dashboard";
 import { AppShell } from "@/components/shell/AppShell";
 import { ModuleNav } from "@/components/shell/ModuleNav";
@@ -7,7 +6,6 @@ import { currentUser } from "@/lib/auth/session";
 
 export default async function Home() {
   const user = await currentUser();
-  if (!user) redirect("/login");
   return (
     <AppShell userName={user.displayName} left={<ModuleNav />} right={<XpGuide />} rightTitle="XP guide">
       <Dashboard name={user.displayName} />

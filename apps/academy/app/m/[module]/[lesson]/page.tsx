@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { LessonHeader } from "@/components/lesson/LessonHeader";
 import { LessonProvider } from "@/components/lesson/LessonProvider";
 import { Inspector } from "@/components/playground/Inspector";
@@ -25,7 +25,6 @@ export default async function LessonPage({ params }: PageProps<"/m/[module]/[les
   const lesson = getLessonBySlug(moduleSlug, lessonSlug);
   if (!lesson) notFound();
   const user = await currentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/m/${moduleSlug}/${lessonSlug}`)}`);
   const { default: Content } = await lessonContent[lesson.id]();
 
   return (

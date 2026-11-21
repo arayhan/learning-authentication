@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { quizAttempts, xpEvents } from "@/lib/db/schema";
 import { course, getLesson, moduleRefs, resolveRef } from "@/lib/course/registry";
-import { POST as register } from "../auth/register/route";
+import { currentUser } from "@/lib/auth/session";
 import { GET, POST } from "./route";
 
 const base = "http://localhost:3000/api/progress";
@@ -12,21 +12,12 @@ const base = "http://localhost:3000/api/progress";
 const q1 = () => getLesson("m1-l1")!.quizzes.find((q) => q.id === "q1")!;
 const right = () => q1().questions.map((q) => q.answer);
 const wrong = () => q1().questions.map((q) => (q.answer + 1) % q.choices.length);
-const tokenOf = (res: Response) => /academy_session=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];
 let cookie = "";
 let userId = "";
 
 beforeEach(async () => {
   await db.execute(sql`truncate table users cascade`);
-  const res = await register(
-    new NextRequest("http://localhost:3000/api/auth/register", {
-      method: "POST",
-      headers: { "content-type": "application/json", host: "localhost:3000" },
-      body: JSON.stringify({ email: "ada@example.com", password: "correct horse", displayName: "Ada" }),
-    }),
-  );
-  cookie = `academy_session=${tokenOf(res)}`;
-  userId = ((await db.execute(sql`select id from users`)) as unknown as { id: string }[])[0].id;
+  userId = (await currentUser()).id;
 });
 
 const rawPost = (body: unknown, c: string | null = cookie) =>
@@ -108,11 +99,6 @@ test("boss with an unanswered (-1) answer inside the time limit → 422 (not 400
 test("invalid tz falls back to UTC instead of failing", async () => {
   const res = await rawPost({ event: { kind: "step", ref: "m1-l1/hook" }, tz: "Not/AZone" });
   expect(res.status).toBe(200);
-});
-
-test("no session → 401", async () => {
-  expect((await rawPost({ event: { kind: "step", ref: "m1-l1/hook" }, tz: "UTC" }, null)).status).toBe(401);
-  expect((await GET(new NextRequest(base, { headers: { host: "localhost:3000" } }))).status).toBe(401);
 });
 
 test("cross-origin POST → 403", async () => {

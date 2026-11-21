@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { assertSameOrigin } from "@/lib/auth/origin";
-import { getSessionUser, SESSION_COOKIE } from "@/lib/auth/session";
+import { currentUser } from "@/lib/auth/session";
 import { resolveRef } from "@/lib/course/registry";
 import type { XpEvent } from "@/lib/course/types";
 import { award, getProgress, QuizFailed, safeTz } from "@/lib/game/award";
@@ -20,12 +20,9 @@ const Body = z.object({
   tz: z.string().max(64).optional(),
 });
 
-const userOf = (req: NextRequest) => getSessionUser(req.cookies.get(SESSION_COOKIE)?.value);
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 export async function GET(req: NextRequest) {
-  const user = await userOf(req);
-  if (!user) return unauthorized();
+  const user = await currentUser();
   return NextResponse.json(await getProgress(user.id, safeTz(req.nextUrl.searchParams.get("tz") ?? undefined)));
 }
 
@@ -36,8 +33,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof Response) return e;
     throw e;
   }
-  const user = await userOf(req);
-  if (!user) return unauthorized();
+  const user = await currentUser();
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid event" }, { status: 400 });

@@ -32,7 +32,4 @@ Add `--ts` to run the TypeScript implementation. Labs listen on `127.0.0.1` only
 ```bash
 pnpm -r test                                          # unit tests (needs Postgres)
 node scripts/contract.mjs 01 go                       # lab contract test, also 02/03 and ts
-pnpm --filter academy exec playwright install chromium   # once
-pnpm --filter academy exec playwright test            # e2e + accessibility, starts academy and Go labs 01-03
-pnpm shots                                            # regenerate lesson screenshots in apps/academy/public/shots
 ```
