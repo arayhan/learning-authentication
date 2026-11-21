@@ -9,6 +9,7 @@ export default defineConfig({
     environment: "node",
     env: { DATABASE_URL: TEST_DB },
     globalSetup: ["./vitest.global-setup.ts"],
+    exclude: ["e2e/**", "node_modules/**", ".next/**"],
     fileParallelism: false,
   },
 });

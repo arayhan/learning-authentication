@@ -82,6 +82,23 @@ import { flows } from "@/content/flows";
 
     Then click **Whoami**. You never sent a password or a header: the browser attached the cookie on its own, and `GET /me` came back `200`.
 
+    <Shot
+      src="/shots/lab01-login.png"
+      alt="The Lab 01 page after a successful login: a card with email and password fields, four buttons, and a response panel reading POST /login 200 with a csrfToken."
+      caption="Lab 01 after Log in. The body carries a csrfToken, but no session id."
+      callouts={[{ x: 50, y: 79, label: "The response body holds only the csrfToken. The session id is not in it: it travels in the Set-Cookie header." }]}
+    />
+
+    <Shot
+      src="/shots/lab01-devtools-cookie.png"
+      alt="Two panels. The console shows document.cookie returning an empty string. The cookie list below shows a cookie named sid with HttpOnly ticked, SameSite Lax and Path /."
+      caption="The same login seen from two sides. JavaScript gets an empty string, the browser's cookie store has the sid."
+      callouts={[
+        { x: 7, y: 16, label: "document.cookie is empty: HttpOnly hides sid from any script on the page, including an injected one." },
+        { x: 24, y: 36, label: "The browser still holds sid, flagged HttpOnly with SameSite=Lax, and sends it on every request to the lab." },
+      ]}
+    />
+
     <Callout type="info">
       Cookies ignore ports. Switch the selector to TS and click Whoami again. The Go and TS labs share one database, so the session you created in one is valid in the other. It is also a handy proof that the session lives in the database, not in the process.
     </Callout>

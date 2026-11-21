@@ -8,6 +8,7 @@
     "contract": "node scripts/contract.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test": "pnpm run test:scripts && pnpm -r --if-present test",
-    "db:up": "docker compose up -d"
+    "db:up": "docker compose up -d",
+    "shots": "pnpm --filter academy exec tsx ../../scripts/shots.ts"
   }
 }

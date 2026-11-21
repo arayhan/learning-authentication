@@ -18,7 +18,7 @@ export function BadgeShelf({ earned }: { earned: readonly BadgeId[] }) {
               key={b.id}
               data-badge={b.id}
               data-earned={got}
-              className={`rounded-lg border p-3 ${got ? "" : "text-muted-foreground opacity-60"}`}
+              className={`rounded-lg border p-3 ${got ? "" : "border-dashed text-muted-foreground"}`}
             >
               {got ? <Award className="size-4 text-brand" aria-hidden /> : <Lock className="size-4" aria-hidden />}
               <p className="mt-2 text-sm font-medium">{b.title}</p>

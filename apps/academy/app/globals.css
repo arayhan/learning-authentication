@@ -56,7 +56,7 @@
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938); /* zinc-500 */
   --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.596 0.145 163.225); /* emerald-600 */
+  --success: oklch(0.508 0.118 165.612); /* emerald-700: AA text contrast on white */
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.555 0.163 48.998); /* amber-700: text-safe on white */
   --warning-foreground: oklch(0.985 0 0);

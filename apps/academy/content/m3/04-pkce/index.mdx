@@ -70,6 +70,12 @@ import { flows } from "@/content/flows";
     2. **Flow B, PKCE.** Do the same with the second button, which sends an S256 challenge.
     3. **Replay each code as the attacker.** The lab's `/__attack/intercept` helper does what the malicious app would do: it knows the code and the redirect URI it saw, but not the verifier, and it calls the token endpoint. The helper only exists in vulnerable mode.
 
+    <Shot
+      src="/shots/lab03-login.png"
+      alt="The Lab 03 authorization server sign-in page: a card titled Sign in, continuing to Demo SPA, with email and password fields and a Sign in button."
+      caption="The page each flow's new tab lands on. Sign in as alice@example.com, then approve."
+    />
+
     You are looking for `200` for Flow A and `400` for Flow B.
 
     <InterceptionAttack />

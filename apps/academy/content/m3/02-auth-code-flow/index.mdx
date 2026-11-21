@@ -61,6 +61,17 @@ import { flows } from "@/content/flows";
     3. Sign in as `alice@example.com` with password `correct-horse-battery`, then click **Approve**.
     4. Back at the app, read the numbered steps: the code, the state check, the token exchange, the access token's claims and the call to `/api/photos`.
 
+    <Shot
+      src="/shots/lab03-spa-log.png"
+      alt="The Lab 03 client page after a finished sign-in. A numbered log lists the prepared request with code verifier, challenge and state, the redirect to the authorization server's authorize URL, and the received authorization code with a matching state."
+      caption="What the client page shows once the flow has run."
+      callouts={[
+        { x: 23, y: 38, label: "Prepare the request: the verifier stays in this tab, only its hash goes out." },
+        { x: 23, y: 61, label: "Redirect to the authorization server: everything about the request is in the query string." },
+        { x: 23, y: 85, label: "The code comes back with the same state value, so the client accepts it." },
+      ]}
+    />
+
     <LabTasks />
 
     Then look at what the Inspector recorded. Select the rows one at a time:
