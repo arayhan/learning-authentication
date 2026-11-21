@@ -1,3 +1,5 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
     You type a password, the page changes, and the app greets you by name. Two separate questions were just answered, and mixing them up is behind a large share of real-world breaches.
@@ -13,6 +15,10 @@
     - **Identity** is the account the system believes you are acting as.
     - **Authentication** is the proof that the caller owns that identity: a password, a passkey, a code.
     - **Authorization** is the decision about what that identity may do, made again on every request.
+
+    Here is the whole round trip in one login. Step through it, and click an arrow with a dotted label to read the raw message.
+
+    <SequenceFlow flow={flows.demo} />
 
     <Callout type="security">
       A 401 means "I do not know who you are". A 403 means "I know who you are, and the answer is no". Returning the wrong one hides bugs and leaks information.

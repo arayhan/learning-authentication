@@ -1,4 +1,5 @@
 import type { MDXComponents } from "mdx/types";
+import { SequenceFlow } from "@/components/flow/SequenceFlow";
 import { Analogy } from "@/components/lesson/Analogy";
 import { BossQuiz } from "@/components/lesson/BossQuiz";
 import { Callout } from "@/components/lesson/Callout";
@@ -38,6 +39,7 @@ const components: MDXComponents = {
   RecapCard,
   ExplainBack,
   Shot,
+  SequenceFlow,
 };
 
 export function useMDXComponents(): MDXComponents {
