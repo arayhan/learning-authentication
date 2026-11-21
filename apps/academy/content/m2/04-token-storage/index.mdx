@@ -56,7 +56,7 @@ import { flows } from "@/content/flows";
     ```
 
     <Callout type="warn">
-      **XSS can still use the session while the page is open.** The injected script can call your API, and it can call `POST /refresh`: the browser attaches the HttpOnly cookie for it and the script receives a fresh access token. What it cannot do is carry the refresh token away. So the damage ends when the tab closes or you revoke the session, instead of lasting 14 days.
+      **XSS can still use the session while the page is open.** The injected script can call your API, and it can call `POST /refresh`: the browser attaches the HttpOnly cookie for it and the script receives a fresh access token. It could even send that access token to the attacker, but it only works until it expires (5 minutes here). What it cannot do is carry the refresh token away, so the damage ends when the tab closes or you revoke the session, instead of lasting 14 days.
     </Callout>
 
     A cookie-carried refresh token raises the CSRF question again. The lab answers it with `SameSite=Strict` and `Path=/refresh`, and a production setup should also check the `Origin` header on `/refresh`. A forged request cannot read the response, so the worst it could do is trigger a rotation.
@@ -133,7 +133,7 @@ import { flows } from "@/content/flows";
         },
         {
           q: "If the access token is only in memory, is XSS still a problem?",
-          a: "Yes. The injected script can call your API and your refresh endpoint from inside the page, and the browser attaches the cookie. It cannot exfiltrate the refresh token, so the attack ends when the page closes or the session is revoked. You still must prevent XSS: output encoding, a strict Content Security Policy and trusted dependencies.",
+          a: "Yes. The injected script can call your API and your refresh endpoint from inside the page, and the browser attaches the cookie. It could send a freshly minted access token to the attacker, but that works only until it expires. It cannot exfiltrate the refresh token, so the attack ends when the page closes or the session is revoked. You still must prevent XSS: output encoding, a strict Content Security Policy and trusted dependencies.",
         },
         {
           q: "Why scope the refresh cookie to Path=/refresh?",

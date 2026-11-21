@@ -101,16 +101,16 @@ export function StorageSim() {
 
       {ran && (
         <p className="max-w-[68ch] text-sm">
-          <strong className="font-semibold">Recommended pattern:</strong> keep the access token in memory and the refresh token in an HttpOnly cookie, as Lab 02 does. The script cannot copy either one out to the attacker&apos;s server.
+          <strong className="font-semibold">Recommended pattern:</strong> keep the access token in memory and the refresh token in an HttpOnly cookie, as Lab 02 does. The script cannot copy the refresh token out. Any access token it manages to obtain only works until it expires (5 minutes in the lab).
         </p>
       )}
 
       {used && (
         <div role="status" className="max-w-[68ch] space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
           <p>
-            <strong className="font-semibold">The script can still use the session while the page is open.</strong> It can call <code className="font-mono text-xs">fetch(&quot;/refresh&quot;)</code>: the browser attaches the HttpOnly cookie on its own, and the script receives a fresh access token.
+            <strong className="font-semibold">The script can still use the session while the page is open.</strong> It can call <code className="font-mono text-xs">fetch(&quot;/refresh&quot;)</code>: the browser attaches the HttpOnly cookie on its own, and the script receives a fresh access token. It could even send that token to the attacker, who can use it only until it expires.
           </p>
-          <p>It cannot take the refresh token away, so the damage ends when the tab closes or you revoke the session. XSS is still an emergency. Storage choices only limit how long it lasts.</p>
+          <p>It cannot take the refresh token away, so it cannot keep minting tokens once the tab closes or you revoke the session. XSS is still an emergency. Storage choices only limit how long it lasts.</p>
         </div>
       )}
 

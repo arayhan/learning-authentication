@@ -94,6 +94,15 @@ describe("TokenDecoder", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("survives claim names that exist on Object.prototype (__proto__, constructor, toString)", () => {
+    const raw = (s: string) => Buffer.from(s).toString("base64url");
+    const payload = '{"__proto__":{"x":1},"constructor":"c","toString":"t","hasOwnProperty":1,"sub":"u"}';
+    wrap(<TokenDecoder defaultToken={`${b64({ alg: "RS256", constructor: "h", toString: "h" })}.${raw(payload)}.c2ln`} />);
+    expect(within(screen.getByLabelText("Payload")).getByText(/"constructor": "c"/)).toBeInTheDocument();
+    expect(screen.getByTestId("claim-sub")).toBeInTheDocument();
+    for (const name of ["constructor", "toString", "hasOwnProperty", "__proto__"]) expect(screen.queryByTestId(`claim-${name}`)).not.toBeInTheDocument();
+  });
+
   it("warns about alg none and never offers it as valid", () => {
     wrap(<TokenDecoder defaultToken={`${b64({ alg: "none" })}.${b64({ sub: "x" })}.`} />);
     expect(screen.getByText(/alg is "none"/i)).toBeInTheDocument();

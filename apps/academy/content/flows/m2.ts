@@ -31,7 +31,11 @@ const statefulVsStateless: Flow = {
   ],
   steps: [
     { from: "browser", to: "api", label: "POST /login", http: loginReq, note: "Authentication happens once, exactly like in Module 1." },
-    { from: "api", to: "browser", label: "200 + access token", http: loginOk(ACCESS, RT1), note: "The reply carries a signed JWT. Claims such as who the user is and when the token expires travel inside it. The refresh cookie comes later, in lesson 3." },
+    { from: "api", to: "browser", label: "200 + access token", http: `HTTP/1.1 200 OK
+${JSON_HDR}
+Cache-Control: no-store
+
+${tokenBody(ACCESS)}`, note: "The reply carries a signed JWT. Claims such as who the user is and when the token expires travel inside it. A refresh cookie joins it in lesson 3." },
     { from: "browser", to: "api", label: "GET /api/profile", http: profile(ACCESS), note: "Every later call presents the token in the Authorization header. Nothing is stored on the server for it." },
     { from: "api", to: "api", label: "verify signature + claims", note: "The API checks the signature with its key and reads iss, aud and exp from the token itself. No session table, no database round trip." },
     { from: "api", to: "browser", label: "200 profile", http: profileOk, note: "The price of this design: the server cannot take the token back before it expires. Lesson 6 is about that." },
@@ -100,7 +104,7 @@ const xssTheft: Flow = {
     { from: "attacker", to: "server", label: "GET /api/profile", http: profile(ACCESS), note: "The attacker replays the token from their own machine. A JWT is a bearer token, so the server cannot tell this apart from the victim.", danger: true },
     { from: "server", to: "attacker", label: "200 (until exp)", http: profileOk, note: "It works until the token expires. A short lifetime limits the loss." },
     { from: "browser", to: "browser", label: "document.cookie", note: "Now the HttpOnly rt cookie: document.cookie does not list it, so the script has nothing to read and send." },
-    { from: "browser", to: "server", label: "POST /refresh (from the page)", http: refreshReq("(sent by the browser, invisible to the script)"), note: "Honest part: while the page is open the script can still call /refresh and the browser attaches the cookie. It gets an access token for that session, but never the refresh token itself.", danger: true },
+    { from: "browser", to: "server", label: "POST /refresh (from the page)", http: refreshReq("(sent by the browser, invisible to the script)"), note: "Honest part: while the page is open the script can still call /refresh and the browser attaches the cookie. It gets a fresh access token, which it could send out too (usable only until exp), but never the refresh token itself.", danger: true },
   ],
 };
 

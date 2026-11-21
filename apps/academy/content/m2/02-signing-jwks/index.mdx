@@ -104,7 +104,7 @@ import { flows } from "@/content/flows";
   </Step>
 
   <Step id="code" title="Code">
-    First the JWKS itself: how the public key becomes a JWK, and how the `kid` is derived (a hash of the key, so it is stable and the same in both labs).
+    First the JWKS itself: how the public key becomes a JWK.
 
     <CodeTabs
       go="labs/02-jwt/go/keys.go#L84-L102"
@@ -114,6 +114,18 @@ import { flows } from "@/content/flows";
         101: "kty RSA, kid, alg RS256, use sig: the document you fetched.",
         36: "Node exports the public key straight to JWK form: n and e only, no private field.",
         37: "kty RSA, kid, alg RS256, use sig: the same document, in TypeScript.",
+      }}
+    />
+
+    The `kid` is derived, not chosen: the first 16 characters of the base64url sha256 of the public key. It is stable, and both labs compute the same value.
+
+    <CodeTabs
+      go="labs/02-jwt/go/keys.go#L47-L51"
+      ts="labs/02-jwt/ts/src/keys.ts#L15-L17"
+      notes={{
+        49: "sha256 of the DER-encoded public key.",
+        50: "base64url, first 16 characters: the kid.",
+        17: "The same recipe: sha256 of the SPKI DER, base64url, sliced to 16 characters.",
       }}
     />
 

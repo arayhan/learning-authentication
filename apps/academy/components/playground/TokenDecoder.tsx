@@ -50,8 +50,8 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
 
   const claimRows = decoded?.ok
     ? [
-        ...["alg", "kid", "typ"].filter((k) => k in decoded.header).map((k) => ({ name: k, value: decoded.header[k], where: "header" })),
-        ...Object.keys(decoded.payload).filter((k) => k in CLAIMS).map((k) => ({ name: k, value: decoded.payload[k], where: "payload" })),
+        ...["alg", "kid", "typ"].filter((k) => Object.hasOwn(decoded.header, k)).map((k) => ({ name: k, value: decoded.header[k], where: "header" })),
+        ...Object.keys(decoded.payload).filter((k) => Object.hasOwn(CLAIMS, k)).map((k) => ({ name: k, value: decoded.payload[k], where: "payload" })),
       ]
     : [];
 
@@ -88,9 +88,9 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
           <p role="group" aria-label="Colour-coded token" className="rounded-md border bg-muted/30 p-3 font-mono text-xs leading-5 break-all">
             <span className="text-brand">{decoded.parts[0]}</span>
             <span className="text-muted-foreground">.</span>
-            <span className="text-success">{decoded.parts[1]}</span>
+            <span className="font-semibold text-foreground">{decoded.parts[1]}</span>
             <span className="text-muted-foreground">.</span>
-            <span className="text-warning">{decoded.parts[2] || "(empty signature)"}</span>
+            <span className="text-muted-foreground underline decoration-dotted underline-offset-2">{decoded.parts[2] || "(empty signature)"}</span>
           </p>
 
           {String(decoded.header.alg).toLowerCase() === "none" && (
@@ -104,12 +104,12 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
               <h4 className="text-xs font-semibold text-brand">Header</h4>
               <pre className="overflow-x-auto font-mono text-xs">{JSON.stringify(decoded.header, null, 2)}</pre>
             </section>
-            <section aria-label="Payload" className="min-w-0 space-y-1.5 rounded-md border border-success/40 p-3">
-              <h4 className="text-xs font-semibold text-success">Payload</h4>
+            <section aria-label="Payload" className="min-w-0 space-y-1.5 rounded-md border border-foreground/30 p-3">
+              <h4 className="text-xs font-semibold text-foreground">Payload</h4>
               <pre className="overflow-x-auto font-mono text-xs">{JSON.stringify(decoded.payload, null, 2)}</pre>
             </section>
-            <section aria-label="Signature" className="min-w-0 space-y-1.5 rounded-md border border-warning/40 p-3">
-              <h4 className="text-xs font-semibold text-warning">Signature</h4>
+            <section aria-label="Signature" className="min-w-0 space-y-1.5 rounded-md border border-dashed border-muted-foreground/50 p-3">
+              <h4 className="text-xs font-semibold text-muted-foreground">Signature</h4>
               <p className="font-mono text-xs break-all">{decoded.parts[2] || "(empty)"}</p>
               <p className="text-xs text-muted-foreground">Decoding does not check it. Only verification does.</p>
             </section>
@@ -121,7 +121,7 @@ export function TokenDecoder({ defaultToken = "" }: { defaultToken?: string }) {
               return (
                 <div key={`${c.where}-${c.name}`} data-testid={`claim-${c.name}`} title={CLAIMS[c.name]} className="rounded-md border p-2 text-sm">
                   <dt className="flex flex-wrap items-baseline gap-2">
-                    <code className={`font-mono text-xs font-semibold ${c.where === "header" ? "text-brand" : "text-success"}`}>{c.name}</code>
+                    <code className={`font-mono text-xs font-semibold ${c.where === "header" ? "text-brand" : "text-foreground"}`}>{c.name}</code>
                     <span className="font-mono text-xs break-all">{show(c.value)}</span>
                     {when && <span className="text-xs font-medium">{when}</span>}
                   </dt>
