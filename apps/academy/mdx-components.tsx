@@ -10,6 +10,8 @@ import { Quiz } from "@/components/lesson/Quiz";
 import { RecapCard } from "@/components/lesson/RecapCard";
 import { Shot } from "@/components/lesson/Shot";
 import { Step } from "@/components/lesson/Step";
+import { LabConsole } from "@/components/playground/LabConsole";
+import { LabTasks } from "@/components/playground/LabTasks";
 
 // Prose is capped at ~68ch; wide blocks (code, shots) opt out in their own components.
 const components: MDXComponents = {
@@ -40,6 +42,8 @@ const components: MDXComponents = {
   ExplainBack,
   Shot,
   SequenceFlow,
+  LabTasks,
+  LabConsole,
 };
 
 export function useMDXComponents(): MDXComponents {

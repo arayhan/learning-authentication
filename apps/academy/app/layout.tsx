@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ProgressProvider } from "@/components/game/ProgressProvider";
 import { Toaster } from "@/components/game/Toaster";
+import { LabImplProvider } from "@/components/playground/LabImpl";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { currentUser } from "@/lib/auth/session";
 import { getProgress } from "@/lib/game/award";
@@ -32,7 +33,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full flex flex-col">
-        <TooltipProvider>{initial ? <ProgressProvider initial={initial}>{children}</ProgressProvider> : children}</TooltipProvider>
+        <TooltipProvider>
+          <LabImplProvider>{initial ? <ProgressProvider initial={initial}>{children}</ProgressProvider> : children}</LabImplProvider>
+        </TooltipProvider>
         <Toaster />
       </body>
     </html>
