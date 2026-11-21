@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 03 · OAuth 2.0 + PKCE</title>
+<style>
+  :root {
+    --bg:#fafafa; --card:#fff; --fg:#18181b; --muted:#71717a; --line:#e4e4e7; --code-bg:#f4f4f5;
+    --accent:#4f46e5; --accent-fg:#fff; --ok:#15803d; --ok-bg:#f0fdf4; --bad:#b91c1c; --bad-bg:#fef2f2; --warn:#a16207; --warn-bg:#fefce8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#09090b; --card:#18181b; --fg:#fafafa; --muted:#a1a1aa; --line:#27272a; --code-bg:#09090b;
+      --accent:#818cf8; --accent-fg:#09090b; --ok:#4ade80; --ok-bg:#052e16; --bad:#f87171; --bad-bg:#450a0a; --warn:#facc15; --warn-bg:#422006;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 16px 64px; background:var(--bg); color:var(--fg); font:15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .mono, code, dd { font-family:"JetBrains Mono", ui-monospace, Consolas, "SFMono-Regular", monospace; }
+  main { max-width:720px; margin:0 auto; }
+  h1 { margin:0 0 4px; font-size:20px; font-weight:600; letter-spacing:-0.01em; }
+  .sub { margin:0 0 24px; color:var(--muted); font-size:14px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin-bottom:24px; }
+  .controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; }
+  button { padding:8px 16px; font:inherit; font-weight:500; cursor:pointer; color:var(--fg); background:transparent; border:1px solid var(--line); border-radius:8px; }
+  button.primary { color:var(--accent-fg); background:var(--accent); border-color:var(--accent); }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  label.check { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); cursor:pointer; }
+  .hint { margin:12px 0 0; font-size:13px; color:var(--muted); }
+  ol { list-style:none; margin:0; padding:0; }
+  li.step { position:relative; display:grid; grid-template-columns:32px 1fr; gap:0 12px; padding-bottom:20px; }
+  li.step:not(:last-child)::before { content:""; position:absolute; left:15px; top:32px; bottom:0; width:1px; background:var(--line); }
+  .num { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; font-size:13px; font-weight:600; color:var(--muted); background:var(--card); border:1px solid var(--line); }
+  .step.ok .num { color:var(--ok); border-color:var(--ok); }
+  .step.err .num { color:var(--bad); border-color:var(--bad); }
+  .step.warn .num { color:var(--warn); border-color:var(--warn); }
+  .head { display:flex; align-items:center; gap:8px; min-height:32px; }
+  .title { font-weight:600; }
+  .badge { padding:1px 8px; border-radius:999px; font-size:12px; font-weight:500; color:var(--muted); border:1px solid var(--line); }
+  .ok .badge { color:var(--ok); background:var(--ok-bg); border-color:transparent; }
+  .err .badge { color:var(--bad); background:var(--bad-bg); border-color:transparent; }
+  .warn .badge { color:var(--warn); background:var(--warn-bg); border-color:transparent; }
+  .note { margin:0 0 6px; font-size:13px; color:var(--muted); }
+  dl { margin:0; padding:8px 12px; background:var(--code-bg); border:1px solid var(--line); border-radius:8px; font-size:12px; }
+  dl > div { display:grid; grid-template-columns:140px 1fr; gap:8px; padding:2px 0; }
+  dt { color:var(--muted); }
+  dd { margin:0; word-break:break-all; white-space:pre-wrap; }
+  .empty { color:var(--muted); font-size:14px; }
+  @media (max-width:520px) { dl > div { grid-template-columns:1fr; gap:0; } }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>OAuth 2.0 + PKCE</h1>
+  <p class="sub">Lab 03 · a public single-page client signing in through an authorization server, then calling a protected API.</p>
+
+  <section class="panel">
+    <div class="controls">
+      <button class="primary" id="start" type="button">Sign in with Demo AS</button>
+      <button id="reset" type="button">Reset</button>
+      <label class="check"><input type="checkbox" id="vuln"> Use vulnerable mode (no PKCE)</label>
+    </div>
+    <p class="hint" id="hint"></p>
+  </section>
+
+  <ol id="log" aria-live="polite"></ol>
+  <p class="empty" id="empty">No steps yet. Start the flow above.</p>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  // The AS sits 10 ports below this page and the API 10 above (go 4103/4113/4123, ts 4203/4213/4223).
+  const port = Number(location.port);
+  const AS = `http://localhost:${port - 10}`;
+  const API = `http://localhost:${port + 10}`;
+  const REDIRECT_URI = `${location.origin}/callback`;
+  const CLIENT_ID = "demo-spa";
+  const SCOPE = "photos.read profile";
+  const KEY = "lab03.flow";
+
+  const $ = (id) => document.getElementById(id);
+  const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const randomB64url = (n) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+  const sha256 = (s) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+
+  // sessionStorage survives the redirect to the AS and back, and dies with the tab.
+  const load = () => { try { return JSON.parse(sessionStorage.getItem(KEY)) || { steps: [] }; } catch { return { steps: [] }; } };
+  const save = (f) => sessionStorage.setItem(KEY, JSON.stringify(f));
+
+  let flow = load();
+
+  function step(status, title, badge, rows, note) {
+    flow.steps.push({ status, title, badge, rows, note });
+    save(flow);
+    render();
+  }
+
+  function render() {
+    const ol = $("log");
+    ol.replaceChildren();
+    $("empty").hidden = flow.steps.length > 0;
+    flow.steps.forEach((s, i) => {
+      const li = document.createElement("li");
+      li.className = `step ${s.status}`;
+      const num = Object.assign(document.createElement("div"), { className: "num", textContent: String(i + 1) });
+      const body = document.createElement("div");
+      const head = document.createElement("div");
+      head.className = "head";
+      head.append(Object.assign(document.createElement("span"), { className: "title", textContent: s.title }));
+      if (s.badge) head.append(Object.assign(document.createElement("span"), { className: "badge", textContent: s.badge }));
+      body.append(head);
+      if (s.note) body.append(Object.assign(document.createElement("p"), { className: "note", textContent: s.note }));
+      if (s.rows && s.rows.length) {
+        const dl = document.createElement("dl");
+        for (const [k, v] of s.rows) {
+          const row = document.createElement("div");
+          row.append(Object.assign(document.createElement("dt"), { textContent: k }), Object.assign(document.createElement("dd"), { textContent: v }));
+          dl.append(row);
+        }
+        body.append(dl);
+      }
+      li.append(num, body);
+      ol.append(li);
+    });
+  }
+
+  const short = (t) => (t.length > 40 ? `${t.slice(0, 28)}…${t.slice(-8)}` : t);
+  const pretty = (o) => JSON.stringify(o, null, 2);
+
+  async function start() {
+    const vulnerable = $("vuln").checked;
+    flow = { steps: [], vulnerable };
+    const verifier = randomB64url(32);
+    const state = randomB64url(16);
+    const challenge = b64url(await sha256(verifier));
+    flow.verifier = verifier;
+    flow.state = state;
+    step("ok", "Prepare the request", "client", vulnerable
+      ? [["state", state], ["PKCE", "skipped (vulnerable mode)"]]
+      : [["code_verifier", verifier], ["code_challenge", `${challenge}  = BASE64URL(SHA-256(verifier))`], ["state", state]],
+      vulnerable ? "No verifier and no challenge: whoever gets the code can redeem it."
+                 : "The verifier stays in this tab. Only its hash goes to the authorization server.");
+
+    const q = new URLSearchParams({ response_type: "code", client_id: CLIENT_ID, redirect_uri: REDIRECT_URI, scope: SCOPE, state });
+    if (vulnerable) q.set("lab_mode", "vulnerable");
+    else { q.set("code_challenge", challenge); q.set("code_challenge_method", "S256"); }
+    const url = `${AS}/authorize?${q}`;
+    step("info", "Redirect to the authorization server", "GET /authorize", [["url", url]], "The user signs in and approves access there. This page never sees the password.");
+    location.assign(url);
+  }
+
+  async function callback() {
+    const p = new URLSearchParams(location.search);
+    history.replaceState(null, "", "/callback"); // a reload must not replay a one-time code
+    if (!p.has("code") && !p.has("error")) return;
+    const { state, verifier, vulnerable } = flow;
+    const back = Object.fromEntries(p);
+    if (!state || p.get("state") !== state) {
+      step("err", "Check the returned state", "rejected", [["expected", state || "(none: no flow in this tab)"], ["received", p.get("state") || "(none)"]],
+        "State ties this response to the request this tab started. A mismatch means a forged or stale callback, so the code is discarded.");
+      return;
+    }
+    if (p.has("error")) {
+      step("err", "Authorization failed", p.get("error"), Object.entries(back), "The user denied the request or the server rejected it. No code was issued.");
+      return;
+    }
+    step("ok", "Receive the authorization code", "callback", [["code", p.get("code")], ["state", `${p.get("state")}  (matches)`]],
+      "The code travels through the browser URL, so it is short-lived (60 s), single-use and bound to this client and redirect_uri.");
+
+    const form = { grant_type: "authorization_code", client_id: CLIENT_ID, code: p.get("code"), redirect_uri: REDIRECT_URI };
+    if (!vulnerable) form.code_verifier = verifier;
+    const res = await fetch(`${AS}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(vulnerable ? { "X-Lab-Mode": "vulnerable" } : {}) },
+      body: new URLSearchParams(form),
+    });
+    const tok = await res.json().catch(() => ({}));
+    const shown = tok.access_token ? { ...tok, access_token: short(tok.access_token) } : tok;
+    step(res.ok ? "ok" : "err", "Exchange the code for a token", `POST /token → ${res.status}`,
+      [["request", pretty(form)], ["response", pretty(shown)]],
+      vulnerable ? "No code_verifier was sent, and none was needed."
+                 : "The server hashed the verifier and compared it with the challenge it stored with the code.");
+    if (!res.ok) return;
+
+    try {
+      const claims = JSON.parse(atob(tok.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      step("ok", "Read the access token", "JWT", Object.entries(claims).map(([k, v]) => [k, String(v)]),
+        "The API will verify the signature against the authorization server's public keys. Anyone can read these claims.");
+    } catch { /* opaque token: nothing to show */ }
+
+    const r = await fetch(`${API}/api/photos`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
+    const body = await r.json().catch(() => ({}));
+    step(r.ok ? "ok" : "err", "Call the protected API", `GET /api/photos → ${r.status}`, [["response", pretty(body)]],
+      r.ok ? "The token carried the photos.read scope, so the API answered." : "The API refused the token.");
+    delete flow.verifier; // the verifier has done its job
+    save(flow);
+  }
+
+  function reset() {
+    sessionStorage.removeItem(KEY);
+    flow = { steps: [] };
+    if (location.pathname !== "/") location.assign("/"); else render();
+  }
+
+  $("start").addEventListener("click", () => start().catch((e) => step("err", "Could not start", "error", [["message", String(e)]])));
+  $("reset").addEventListener("click", reset);
+  $("vuln").checked = !!flow.vulnerable;
+  $("hint").textContent = location.hostname === "localhost"
+    ? `Authorization server ${AS} · API ${API} · redirect_uri ${REDIRECT_URI}`
+    : `Open this page at http://localhost:${port}: the registered redirect_uri is on "localhost", and a different host is rejected.`;
+  render();
+  if (location.pathname === "/callback") callback().catch((e) => step("err", "Callback failed", "error", [["message", String(e)]]));
+})();
+</script>
+</body>
+</html>
