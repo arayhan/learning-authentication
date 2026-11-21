@@ -2,5 +2,6 @@ go 1.27
 
 use (
 	./labs/01-sessions/go
+	./labs/02-jwt/go
 	./packages/trace/go
 )
