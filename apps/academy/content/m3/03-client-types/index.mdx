@@ -1,17 +1,129 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    In lesson 2 the client sent a code to `/token` and got a token back. A question was hiding in that step: how does the authorization server know the request really comes from the client it says it is?
+
+    The answer depends on what kind of program the client is. A server in a locked room can keep a password. An app that you download to a stranger's device cannot.
+
+    <Analogy title="The diary">
+      A diary kept in a locked drawer stays private, and a diary left open on a shared table does not. Code that runs on the user's device is the table: whatever you write in it, the user and anyone near them can read.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    RFC 6749 section 2.1 sorts clients by one question: **can this client keep a credential confidential?**
+
+    | | **Confidential client** | **Public client** |
+    |---|---|---|
+    | Can keep a secret | Yes | No |
+    | Examples | Server-rendered web app, backend service, a job | Single-page app, mobile app, desktop app |
+    | Authenticates at `/token` | With its secret or a key | It cannot, so it only sends its `client_id` |
+    | What protects its codes | The secret, and PKCE (recommended) | PKCE (required) |
+    | In the lab | `demo-backend` has the secret `lab-secret` | `demo-spa` has no secret |
+
+    The lab registers both. The point of the table is the last row. A public client's `client_id` is not a secret, its redirect URI is in its own source, and its token request can be copied by anyone. If an attacker steals a code, nothing but PKCE stops them from redeeming it.
+
+    <Callout type="warn">
+      Do not make a SPA "confidential" by embedding a `client_secret` in its bundle. Everyone who loads the page has the secret, so it proves nothing, and it can give a false sense of safety. Treat browser and mobile apps as public clients.
+    </Callout>
+
+    A common alternative for browser apps is a **backend for frontend**: a small server that holds the tokens and the client secret, and talks to the browser with an ordinary session cookie. The browser then never sees an OAuth token. It trades the token handling problems of Module 2, lesson 4, for a stateful server.
+
+    **Native apps** (phones, desktops) are public clients too. RFC 8252 asks them to sign in through the **system browser**, never an embedded web view, so the app cannot read the user's password. Lesson 4 shows what goes wrong with the redirect on a phone.
+  </Step>
+
+  <Step id="implicit" title="The implicit flow">
+    Before PKCE existed, browser apps used the **implicit flow** (RFC 6749 section 4.2): no code, no back channel. The authorization server returned the access token directly, in the URL fragment of the redirect. It was designed for the case "the browser cannot make a cross-origin request", which stopped being true once CORS arrived.
+
+    <SequenceFlow flow={flows.implicitDeprecated} />
+
+    Why it was retired (RFC 9700 and OAuth 2.1):
+
+    - **The token is in the URL.** It reaches browser history, extensions, scripts, shared screens and anything else that sees the address bar.
+    - **No binding.** Any party that gets the token can use it. There is no step where the client proves it is the one that asked.
+    - **No refresh tokens and no client authentication.** The flow has no back-channel step where either could happen.
+
+    The replacement is not a new flow. It is the one from lesson 2 with PKCE, which works for the same apps and keeps the token off the URL. You can ask the lab for the old flow and see it refuse (use the port of your selected implementation):
+
+    ```bash
+    curl -i "http://localhost:4103/authorize?response_type=token&client_id=demo-spa&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback&scope=photos.read&state=abc"
+    ```
+
+    The answer is `302` to the callback with `error=unsupported_response_type`. The same reasoning removes the **resource owner password credentials** grant, where the app collects the password itself, which defeats the purpose of this whole module.
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="code" title="Code">
+    The lab's two clients. The comment on `demo-spa` is the whole lesson: it has no secret.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/clients.go#L25-L39"
+      ts="labs/03-oauth-pkce/ts/src/clients.ts#L13-L23"
+      notes={{
+        26: "demo-spa has no Secret field: it is a public client, so PKCE is its protection.",
+        29: "Redirect URIs are registered ahead of time. They are compared exactly (lesson 5).",
+        35: "demo-backend is confidential: it has a secret and no redirect URIs, because it never uses a browser.",
+        14: "demo-spa has no secret: it is a public client, so PKCE is its protection.",
+        17: "Registered redirect URIs, compared exactly.",
+        22: "demo-backend is confidential: it has a secret and no redirect URIs.",
+      }}
+    />
+
+    A confidential client's secret is checked in constant time. A public client can never match, so even an attempt to authenticate as one fails.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/clients.go#L54-L61"
+      ts="labs/03-oauth-pkce/ts/src/clients.ts#L38-L39"
+      notes={{
+        56: "A public client has no secret, so it never matches.",
+        59: "Hash both sides first, then compare in constant time: neither timing nor length leaks.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Clients are public or confidential depending on whether they can keep a secret, not on how important they are.",
+        "SPAs, mobile and desktop apps are public. A client secret in their code protects nothing.",
+        "Public clients rely on PKCE. Confidential clients also authenticate with a secret or a key.",
+        "The implicit flow put the access token in the URL and was retired by RFC 9700 and OAuth 2.1. Use the code flow with PKCE.",
+        "Native apps sign in through the system browser, not an embedded web view (RFC 8252).",
+      ]}
+      interview={[
+        {
+          q: "What is the difference between a public and a confidential client?",
+          a: "A confidential client can keep a credential secret, such as a server-side app, and authenticates to the token endpoint with it. A public client runs on the user's device, such as a SPA or a mobile app, so it cannot, and it is protected by PKCE and exact redirect URIs.",
+        },
+        {
+          q: "Why was the implicit flow deprecated?",
+          a: "It returned the access token in the redirect URL, where it leaks to history, extensions and scripts, with no way to bind it to the client and no back-channel step. The authorization code flow with PKCE serves the same apps and keeps the token off the URL. RFC 9700 says not to use implicit, and OAuth 2.1 removes it.",
+        },
+        {
+          q: "Can a single-page app be a confidential client?",
+          a: "Not by shipping a secret in its code, since the user can read it. A SPA can be paired with a backend for frontend that holds the secret and the tokens, but then the backend is the OAuth client and the SPA is just its UI.",
+        },
+        {
+          q: "How should a native app sign the user in?",
+          a: "In the system browser, with the authorization code flow and PKCE, as RFC 8252 requires. An embedded web view lets the app read the password and cookies, and it breaks single sign-on.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain why a single-page app cannot use a client secret, and what protects its authorization code instead."
+      rubric={[
+        "Anything delivered to the browser can be read by the user or an attacker",
+        "A secret in the bundle authenticates nobody, so the app is a public client",
+        "PKCE binds the code to the instance of the app that asked for it",
+        "Exact redirect URIs limit where the code can be sent",
+      ]}
+    />
   </Step>
 </LessonSteps>

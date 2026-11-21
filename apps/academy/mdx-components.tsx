@@ -14,8 +14,11 @@ import { CsrfSim } from "@/components/playground/CsrfSim";
 import { FixationAttack } from "@/components/playground/FixationAttack";
 import { HashPlayground } from "@/components/playground/HashPlayground";
 import { LabConsole } from "@/components/playground/LabConsole";
+import { InterceptionAttack } from "@/components/playground/InterceptionAttack";
 import { JwtAttackLab } from "@/components/playground/JwtAttackLab";
 import { LabTasks } from "@/components/playground/LabTasks";
+import { OAuthUrlBuilder } from "@/components/playground/OAuthUrlBuilder";
+import { PkceGenerator } from "@/components/playground/PkceGenerator";
 import { StorageSim } from "@/components/playground/StorageSim";
 import { TokenDecoder } from "@/components/playground/TokenDecoder";
 
@@ -56,6 +59,9 @@ const components: MDXComponents = {
   TokenDecoder,
   StorageSim,
   JwtAttackLab,
+  PkceGenerator,
+  OAuthUrlBuilder,
+  InterceptionAttack,
 };
 
 export function useMDXComponents(): MDXComponents {

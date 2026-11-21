@@ -1,17 +1,161 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    The user has to approve the app at the authorization server, and then the app has to get a token. The tricky part is how the result gets back to the app, because the only road between the two is the **browser**, and the browser is a public place: URLs land in history, logs, `Referer` headers and extensions.
+
+    The authorization code flow solves it by splitting the delivery in two. The browser carries something nearly worthless, and the valuable part travels on a private line.
+
+    <Analogy title="The claim ticket">
+      At a coat check you hand in your coat and get a paper ticket. The ticket alone is just paper, and only the counter can swap it for your coat. The code is the ticket, and the token request is the counter.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    The flow has two channels. The **front channel** goes through the user's browser (redirects). The **back channel** is a direct HTTPS call from the client to the authorization server.
+
+    <SequenceFlow flow={flows.authCode} />
+
+    **Step 1, the authorization request** (front channel). The client sends the browser to `GET /authorize` with these query parameters (RFC 6749 section 4.1.1):
+
+    | Parameter | Meaning |
+    |---|---|
+    | `response_type=code` | Use the authorization code flow |
+    | `client_id` | Which registered client is asking |
+    | `redirect_uri` | Where to send the browser back. Must match a registered value exactly |
+    | `scope` | The access requested, space separated |
+    | `state` | An unguessable value the client checks on return (lesson 5) |
+    | `code_challenge`, `code_challenge_method` | PKCE (lesson 4). Required by the lab |
+
+    **Step 2, authentication and consent.** The authorization server shows its own sign-in page and a consent screen. Only here does the password exist.
+
+    **Step 3, the redirect back** (front channel). On approval the server answers `302` to `redirect_uri` with `?code=...&state=...`. On refusal it sends `?error=access_denied`.
+
+    **Step 4, the token request** (back channel). The client calls `POST /token` with `grant_type=authorization_code`, the `code`, the same `redirect_uri` and its `client_id` (plus the PKCE verifier). The answer is the access token.
+
+    The code is deliberately weak on its own. In the lab it is:
+
+    - **Short-lived**: 60 seconds.
+    - **Single-use**: redeeming it a second time fails, and the tokens from the first redemption are revoked.
+    - **Bound** to the client and the exact `redirect_uri` it was issued for.
+    - **Stored hashed**: the database holds sha256 of the code, as with session ids in Module 1.
+
+    <Callout type="security">
+      The order of checks matters. RFC 6749 section 4.1.2.1 says that a bad `client_id` or `redirect_uri` gets an **error page and no redirect**, because redirecting to an unverified URL would make the server an open redirector. Only later errors (`invalid_scope`, `access_denied`, a missing `response_type`) are reported by redirecting back with `?error=...&state=...`.
+    </Callout>
+
+    Every token response carries `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 section 5.1), for the same reason you saw in Module 2: a token must never sit in a cache.
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Run the whole flow once with a real client. The lab serves a small single-page app that plays `demo-spa`.
+
+    1. Open the client for the implementation you selected: [http://localhost:4113](http://localhost:4113) for Go, [http://localhost:4213](http://localhost:4213) for TypeScript.
+    2. Leave **vulnerable mode** unticked and click **Sign in with Demo AS**.
+    3. Sign in as `alice@example.com` with password `correct-horse-battery`, then click **Approve**.
+    4. Back at the app, read the numbered steps: the code, the state check, the token exchange, the access token's claims and the call to `/api/photos`.
+
+    <LabTasks />
+
+    Then look at what the Inspector recorded. Select the rows one at a time:
+
+    - `GET /authorize` (role `as`): the whole request in the query string.
+    - `POST /consent` (role `as`): a `302` whose **Location** header holds the `code`. This is the redirect the browser followed.
+    - `POST /token` (role `as`): the code and verifier go in, the access token comes out. This is the back channel.
+    - `GET /api/photos` (role `api`): the request carries `Authorization: Bearer ...`.
+
+    Two requests you can make by hand in the console below. The first proves that a bad client gets an error page with no redirect, and the second shows the public keys the API uses to verify tokens.
+
+    <LabConsole
+      lab="03"
+      actions={[
+        { label: "Authorize with an unknown client", method: "GET", path: "/authorize?response_type=code&client_id=nope&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback&scope=photos.read&state=x" },
+        { label: "JWKS", method: "GET", path: "/.well-known/jwks.json" },
+      ]}
+    />
+
+    The unknown client got a `400` and a page, not a `302`. The authorization server did not trust the `redirect_uri` enough to send anyone there.
+  </Step>
+
+  <Step id="code" title="Code">
+    The authorization endpoint. Notice the order: client and redirect_uri first, then everything that can be reported by redirecting, then the request is parked on the server under a random id until the user has signed in and consented.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/as.go#L242-L280"
+      ts="labs/03-oauth-pkce/ts/src/as.ts#L109-L140"
+      notes={{
+        247: "client_id and redirect_uri are checked first. A failure here is an error page, never a redirect.",
+        254: "Only now can errors go back to the client as ?error=.",
+        260: "PKCE is required: the challenge must be S256 and well formed (lesson 4).",
+        267: "The requested scope must be a subset of what this client may ever be granted.",
+        273: "The request is stored server-side under a random id. The forms carry only that id.",
+        115: "client_id and redirect_uri first: an error page, never a redirect.",
+        121: "Later errors go back as ?error=.",
+        127: "PKCE is required: S256 and a well formed challenge.",
+        131: "The requested scope must be a subset of the client's allowed scope.",
+        136: "Parked server-side under a random id until login and consent.",
+      }}
+    />
+
+    Redeeming the code. All checks happen in one transaction with the code row locked, so two requests cannot both win.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/store.go#L156-L190"
+      ts="labs/03-oauth-pkce/ts/src/store.ts#L93-L112"
+      notes={{
+        169: "A code that was already used is theft: revoke the tokens it produced and fail.",
+        175: "Expired, a different client or a different redirect_uri: invalid_grant, nothing changes.",
+        184: "Mark the code used and record the token in the same transaction.",
+        100: "Already used: revoke what it produced. The revoke is returned, not thrown, so it commits.",
+        104: "Expired, wrong client or wrong redirect_uri: invalid_grant.",
+        109: "Mark the code used.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "The front channel (browser redirects) carries a one-time code. The back channel (POST /token) carries the token.",
+        "The authorization server authenticates the user and collects consent. The client sees neither password nor consent page.",
+        "A bad client_id or redirect_uri gets an error page, never a redirect (RFC 6749 section 4.1.2.1).",
+        "A code is short-lived, single-use and bound to the client and redirect_uri. Reuse means revoke.",
+        "Token responses are sent with Cache-Control: no-store.",
+      ]}
+      interview={[
+        {
+          q: "Walk me through the authorization code flow.",
+          a: "The client redirects the browser to /authorize with client_id, redirect_uri, scope, state and a PKCE challenge. The user signs in and consents at the authorization server, which redirects back with a short-lived single-use code and the state. The client checks the state and POSTs the code, redirect_uri and PKCE verifier to /token over the back channel, and gets an access token. It sends the token as a Bearer credential to the API.",
+        },
+        {
+          q: "Why is there a code at all? Why not return the token in the redirect?",
+          a: "Redirects pass through the browser, where URLs leak to history, logs, referrers and extensions. The code is useless alone: it is short-lived, single-use, bound to the client and redirect_uri, and needs the client's PKCE verifier, so the token itself only travels over a direct TLS call.",
+        },
+        {
+          q: "What should the server do when redirect_uri does not match?",
+          a: "Show an error page and not redirect. Redirecting to an unverified URL would be an open redirect, and it could deliver a code to an attacker. The comparison is an exact string match.",
+        },
+        {
+          q: "What happens if an authorization code is used twice?",
+          a: "The second request is rejected with invalid_grant, and the server revokes the tokens issued from the first use, because two parties know the code. A failed attempt with a wrong verifier or redirect_uri changes nothing, so a thief cannot burn the real client's code.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain the difference between the front channel and the back channel in the code flow, and say what travels on each."
+      rubric={[
+        "Front channel goes through the user's browser: the authorization request and the redirect back with the code",
+        "Back channel is a direct client-to-server call: the token request and its response",
+        "The code is a short, single-use ticket that is useless alone",
+        "The access token is never put in a URL",
+      ]}
+    />
   </Step>
 </LessonSteps>

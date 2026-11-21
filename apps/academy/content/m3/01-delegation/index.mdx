@@ -1,17 +1,124 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    Modules 1 and 2 were about proving who a user is to **your own** service. Now a different app wants to work with that user's data at your service: a print shop that wants to fetch photos, a calendar tool that wants to read events.
+
+    The oldest answer is to ask the user for their password. It works, and it is a disaster. This module is about the answer that replaced it.
+
+    <Analogy title="The valet key">
+      A valet key starts the car and opens the door, but not the trunk or the glove box. You hand it over without handing over your whole life. An access token is a valet key for your data.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    Picture a print shop asking for your photo-service password. Everything goes wrong at once:
+
+    - **Too much power.** The shop can do anything you can: read private albums, delete photos, change your email.
+    - **No way back.** The only way to cut the shop off is to change your password, which cuts off every other app you gave it to.
+    - **A bigger target.** The shop now stores a password for another company's service. If the shop is breached, so are you.
+    - **No second factor, no consent, no audit.** The photo service cannot tell the shop from you.
+
+    **OAuth 2.0** (RFC 6749) fixes this with *delegated authorization*. The user signs in at the service that owns the data and approves a specific request. The app receives an **access token** that is limited in three ways:
+
+    | Limit | What it means |
+    |---|---|
+    | **Scope** | Only the access that was approved, for example `photos.read` |
+    | **Time** | It expires, in the lab after 5 minutes |
+    | **Revocable** | The user or the service can withdraw it without touching the password |
+
+    <SequenceFlow flow={flows.oauthRoles} />
+
+    <Callout type="info">
+      OAuth 2.0 answers "may this app do this?", not "who is this person?". The token says that an authority granted a client some access. Signing users in to an app is a separate job that **OpenID Connect** does on top of OAuth. Treating a plain access token as a login is a classic design mistake.
+    </Callout>
+  </Step>
+
+  <Step id="roles" title="The four roles">
+    RFC 6749 section 1.1 defines four roles. They are roles, not machines: one process can play several.
+
+    | Role | Who it is | In the lab |
+    |---|---|---|
+    | **Resource owner** | The user who owns the data and can grant access | alice@example.com |
+    | **Client** | The app that wants access on the user's behalf | `demo-spa`, a browser app on port 4113 (Go) or 4213 (TS) |
+    | **Authorization server** | Authenticates the user, asks for consent, issues tokens | Port 4103 (Go) or 4203 (TS) |
+    | **Resource server** | Hosts the data and accepts or rejects tokens | The photos API on port 4123 (Go) or 4223 (TS) |
+
+    Three things to notice before you start building:
+
+    1. **The client never sees the password.** The user types it at the authorization server only.
+    2. **The resource server never talks to the user.** It reads the token the client sends. In the lab it checks the signature with the authorization server's public keys, exactly as you did in Module 2.
+    3. **The token is the contract between the last two.** What is in it (`sub`, `client_id`, `scope`, `aud`, `exp`) is everything the API knows about the grant.
+
+    In lessons 2 to 6 you will use all four. Watch the Inspector on the right: it shows requests from the authorization server and the API in one list, with a small badge for each role.
+
+    <Callout type="info">
+      In Phase 2 you will want to know which of these roles each of your own services plays. That is a good question to carry through the module.
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="code" title="Code">
+    The only output of the whole dance is a signed token. This is the lab code that builds it. Compare it with the access tokens of Module 2: it is the same kind of JWT, with two claims added that make it a delegation, `client_id` and `scope`.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/as.go#L368-L377"
+      ts="labs/03-oauth-pkce/ts/src/as.ts#L29-L41"
+      notes={{
+        372: "iss, aud and sub as in Module 2. client_id says which app this token was granted to.",
+        373: "scope is the approved access, and the API checks it. jti lets one token be revoked.",
+        375: "The kid header tells the API which public key from the JWKS to use.",
+        32: "client_id and scope are the two delegation claims.",
+        34: "iss: the authorization server.",
+        35: "aud: the API this token is for.",
+        36: "sub: the user, or the client itself for client credentials.",
+        39: "jti: a unique id, so one token can be revoked.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Sharing a password gives an app full power, no way to revoke it alone, and a bigger breach surface.",
+        "OAuth 2.0 delegates authorization: the user approves a scoped, expiring, revocable token (RFC 6749).",
+        "Four roles: resource owner, client, authorization server, resource server.",
+        "The client never sees the password, and the resource server never talks to the user.",
+        "OAuth is not authentication. OpenID Connect adds the identity layer.",
+      ]}
+      interview={[
+        {
+          q: "Why not let a third-party app ask for the user's password?",
+          a: "It would get unlimited access, the user could not revoke it without changing the password everywhere, a breach of the app would expose the credential, and the service could not tell the app from the user. OAuth gives the app a scoped, expiring, revocable token instead.",
+        },
+        {
+          q: "Name the four OAuth 2.0 roles.",
+          a: "The resource owner (the user), the client (the app that wants access), the authorization server (authenticates the user, gets consent, issues tokens), and the resource server (hosts the data and validates tokens). The last two are often run by the same company but are separate responsibilities.",
+        },
+        {
+          q: "Is OAuth 2.0 an authentication protocol?",
+          a: "No. It is an authorization framework: a token says a client was granted some access. It does not say the user is present. OpenID Connect layers an ID token and a standard user-info on top to cover login.",
+        },
+        {
+          q: "What is a scope?",
+          a: "A name for a unit of access, such as photos.read. The client requests scopes, the user approves them, the token carries them, and the resource server enforces them on each request.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate why an app should get an OAuth token instead of the user's password, using the valet key idea."
+      rubric={[
+        "The password gives unlimited access, the token only what was approved",
+        "A token expires and can be revoked without changing the password",
+        "The user signs in at the service that owns the data, never at the app",
+        "OAuth delegates authorization, it is not proof of who the user is",
+      ]}
+    />
   </Step>
 </LessonSteps>

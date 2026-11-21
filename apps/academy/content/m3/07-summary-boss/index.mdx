@@ -1,6 +1,24 @@
 <LessonSteps>
   <Step id="intro" title="Intro">
-    Content coming soon.
+    Ten questions from the whole module, ten minutes, and you need **8 correct** to pass. There is no feedback until the end, and choices are shuffled each attempt. You can retry as often as you like.
+
+    Skim the checklist first. It doubles as an OAuth 2.1 and Security BCP (RFC 9700) review list for a real system.
+
+    | Topic | One line to remember |
+    |---|---|
+    | Why OAuth | Delegated authorization: a scoped, expiring, revocable token instead of a shared password. Not authentication. |
+    | Roles | Resource owner, client, authorization server, resource server (RFC 6749). |
+    | Code flow | Front channel carries a one-time **code**. The token comes back on the back channel. |
+    | Client types | Public clients cannot keep a secret (SPA, mobile). Confidential ones can. |
+    | PKCE | `code_challenge = BASE64URL(SHA-256(verifier))`, S256 only. OAuth 2.1 requires it for the code flow. |
+    | Implicit and password grants | Gone in OAuth 2.1. Do not build on them. |
+    | `state` | Unguessable, bound to the browser session, checked on every callback. |
+    | `redirect_uri` | Registered ahead, compared by **exact string**. Bad value: error page, never a redirect. |
+    | Scopes | Enforced by the resource server on each request. `403 insufficient_scope` for a valid token that lacks one. |
+    | Codes | Short-lived, single-use, bound to client and redirect URI. Reuse means revoke. |
+    | Client credentials | Server to server, the client's own secret, no user, no refresh token. |
+    | Native apps | System browser, code flow and PKCE, never an embedded web view (RFC 8252). |
+    | Token responses | `Cache-Control: no-store` and `Pragma: no-cache` (RFC 6749 section 5.1). |
 
     <BossQuiz id="boss" />
   </Step>

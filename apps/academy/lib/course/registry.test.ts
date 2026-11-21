@@ -174,6 +174,7 @@ describe("ref namespace", () => {
 describe.each([
   { m: 0, dir: "m1", labDir: "01-sessions", boss: "m1-l7" },
   { m: 1, dir: "m2", labDir: "02-jwt", boss: "m2-l7" },
+  { m: 2, dir: "m3", labDir: "03-oauth-pkce", boss: "m3-l7" },
 ])("module $dir content", ({ m, dir: modDir, labDir, boss }) => {
   const dir = path.join(__dirname, "../../content", modDir);
   const mdx = readdirSync(dir).map((d) => ({ d, src: readFileSync(path.join(dir, d, "index.mdx"), "utf8") }));
@@ -214,6 +215,152 @@ describe.each([
     for (const { d, src } of mdx.filter((x) => !x.d.startsWith("07"))) {
       expect([...src.matchAll(/\bq: "/g)].length, d).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe("module 3 CodeTabs notes", () => {
+  // `notes` is keyed by absolute line number and shared by the Go and TS panels, so a key must fall inside exactly one
+  // of the two ranges of its block: otherwise a note is dropped, or shown on the wrong language.
+  it("every note line lands in exactly one of its block's two ranges", () => {
+    const dir = path.join(__dirname, "../../content/m3");
+    for (const d of readdirSync(dir)) {
+      const src = readFileSync(path.join(dir, d, "index.mdx"), "utf8");
+      for (const [block] of src.matchAll(/<CodeTabs[\s\S]*?\/>/g)) {
+        const ranges = [...block.matchAll(/#L(\d+)-L(\d+)"/g)].map((r) => [Number(r[1]), Number(r[2])]);
+        const notes = block.match(/notes=\{\{([\s\S]*?)\}\}/)?.[1] ?? "";
+        for (const [, line] of notes.matchAll(/^\s*(\d+):/gm)) {
+          const hits = ranges.filter(([a, b]) => Number(line) >= a && Number(line) <= b).length;
+          expect(hits, `${d}: note ${line} must be inside exactly one range`).toBe(1);
+        }
+      }
+    }
+  });
+});
+
+describe("m3 lab tasks", () => {
+  const e03 = (
+    role: TraceEvent["role"],
+    method: string,
+    p: string,
+    status: number,
+    o: { reqHeaders?: Record<string, string>; resHeaders?: TraceEvent["res"]["headers"]; reqBody?: string; body?: string } = {},
+  ): TraceEvent => ({
+    id: "e1",
+    ts: "2026-01-01T00:00:00Z",
+    lab: "03",
+    impl: "go",
+    role,
+    req: { method, path: p, query: "", headers: o.reqHeaders ?? {}, body: o.reqBody },
+    res: { status, headers: o.resHeaders ?? {}, body: o.body },
+    durationMs: 1,
+  });
+  const codeForm = "grant_type=authorization_code&client_id=demo-spa&code=abc&redirect_uri=http%3A%2F%2Flocalhost%3A4113%2Fcallback";
+  const withVerifier = `${codeForm}&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk`;
+  const credForm = "grant_type=client_credentials&scope=photos.read";
+  const tokenBody = '{"access_token":"eyJ.x.y","token_type":"Bearer","expires_in":300,"scope":"photos.read"}';
+  const loc = (code: string) => ({ location: `http://localhost:4113/callback?${code}&state=xyz` });
+
+  const cases: Record<string, { hit: TraceEvent; miss: TraceEvent[] }> = {
+    "m3-l2/authorize-302-code": {
+      hit: e03("as", "POST", "/consent", 302, { resHeaders: loc("code=abc") }),
+      miss: [
+        e03("as", "POST", "/consent", 302, { resHeaders: loc("error=access_denied") }), // denied: no code
+        e03("as", "POST", "/consent", 403),
+        e03("as", "GET", "/consent", 302, { resHeaders: loc("code=abc") }),
+        e03("as", "GET", "/authorize", 302, { resHeaders: loc("code=abc") }),
+        e03("client", "POST", "/consent", 302, { resHeaders: loc("code=abc") }),
+        e03("as", "POST", "/consent", 302, { resHeaders: { location: "http://localhost:4113/callback?state=xyz&barcode=1" } }), // "code=" inside another name
+      ],
+    },
+    "m3-l2/token-200": {
+      hit: e03("as", "POST", "/token", 200, { reqBody: codeForm, body: tokenBody }),
+      miss: [
+        e03("as", "POST", "/token", 200, { reqBody: credForm, body: tokenBody }), // that is lesson 6
+        e03("as", "POST", "/token", 400, { reqBody: codeForm, body: '{"error":"invalid_grant"}' }),
+        e03("as", "GET", "/token", 200, { reqBody: codeForm, body: tokenBody }),
+        e03("as", "POST", "/token", 200, { reqBody: codeForm }),
+        e03("api", "POST", "/token", 200, { reqBody: codeForm, body: tokenBody }),
+      ],
+    },
+    "m3-l2/api-200-bearer": {
+      hit: e03("api", "GET", "/api/photos", 200, { reqHeaders: { authorization: "Bearer eyJ.x.y" } }),
+      miss: [
+        e03("api", "GET", "/api/photos", 200),
+        e03("api", "GET", "/api/photos", 200, { reqHeaders: { authorization: "Basic abc" } }),
+        e03("api", "GET", "/api/photos", 401, { reqHeaders: { authorization: "Bearer eyJ.x.y" } }),
+        e03("api", "GET", "/api/photos", 403, { reqHeaders: { authorization: "Bearer eyJ.x.y" } }),
+        e03("api", "POST", "/api/photos", 200, { reqHeaders: { authorization: "Bearer eyJ.x.y" } }),
+        e03("as", "GET", "/api/photos", 200, { reqHeaders: { authorization: "Bearer eyJ.x.y" } }),
+      ],
+    },
+    "m3-l4/token-400-bad-verifier": {
+      hit: e03("as", "POST", "/token", 400, { reqBody: withVerifier, body: '{"error":"invalid_grant"}' }),
+      miss: [
+        e03("as", "POST", "/token", 400, { reqBody: codeForm, body: '{"error":"invalid_grant"}' }), // no verifier sent at all
+        e03("as", "POST", "/token", 400, { reqBody: withVerifier, body: '{"error":"invalid_request"}' }),
+        e03("as", "POST", "/token", 200, { reqBody: withVerifier, body: tokenBody }),
+        e03("as", "POST", "/token", 400, { reqBody: `grant_type=refresh_token&code_verifier=x`, body: '{"error":"invalid_grant"}' }),
+        e03("api", "POST", "/token", 400, { reqBody: withVerifier, body: '{"error":"invalid_grant"}' }),
+      ],
+    },
+    "m3-l5/api-403-scope": {
+      hit: e03("api", "GET", "/api/photos", 403, { reqHeaders: { authorization: "Bearer eyJ.x.y" }, body: '{"error":"insufficient_scope"}' }),
+      miss: [
+        e03("api", "GET", "/api/photos", 401, { body: '{"error":"invalid_token"}' }),
+        e03("api", "GET", "/api/photos", 403, { body: '{"error":"forbidden"}' }),
+        e03("api", "GET", "/api/photos", 200, { body: '{"photos":[]}' }),
+        e03("as", "GET", "/api/photos", 403, { body: '{"error":"insufficient_scope"}' }),
+        e03("api", "POST", "/api/photos", 403, { body: '{"error":"insufficient_scope"}' }),
+      ],
+    },
+    "m3-l5/authorize-400-redirect": {
+      hit: e03("as", "GET", "/authorize", 400),
+      miss: [
+        e03("as", "GET", "/authorize", 200), // login or consent page
+        e03("as", "GET", "/authorize", 302, { resHeaders: { location: "http://localhost:4113/callback?error=invalid_scope" } }), // errors after the redirect check are redirected
+        e03("as", "POST", "/authorize", 400),
+        e03("as", "GET", "/token", 400),
+        e03("api", "GET", "/authorize", 400),
+      ],
+    },
+    "m3-l6/client-credentials-200": {
+      hit: e03("as", "POST", "/token", 200, { reqBody: credForm, body: tokenBody }),
+      miss: [
+        e03("as", "POST", "/token", 200, { reqBody: codeForm, body: tokenBody }),
+        e03("as", "POST", "/token", 401, { reqBody: credForm, body: '{"error":"invalid_client"}' }),
+        e03("as", "POST", "/token", 400, { reqBody: credForm, body: '{"error":"invalid_scope"}' }),
+        e03("as", "GET", "/token", 200, { reqBody: credForm, body: tokenBody }),
+        e03("as", "POST", "/token", 200, { reqBody: credForm }),
+      ],
+    },
+  };
+
+  it("covers every lab task of module 3 exactly once, all on lab 03", () => {
+    const all = course[2].lessons.flatMap((l) => l.labTasks.map((t) => `${l.id}/${t.id}`));
+    expect(all.sort()).toEqual(Object.keys(cases).sort());
+    for (const l of course[2].lessons) for (const t of l.labTasks) expect(t.lab).toBe("03");
+  });
+
+  it("authorize-302-code accepts a Location header recorded as a list", () => {
+    const task = getLesson("m3-l2")!.labTasks.find((t) => t.id === "authorize-302-code")!;
+    expect(task.match(e03("as", "POST", "/consent", 302, { resHeaders: { location: ["http://localhost:4113/callback?code=abc&state=x"] } }))).toBe(true);
+  });
+
+  for (const [ref, { hit, miss }] of Object.entries(cases)) {
+    it(`${ref}: matches its event, ignores near misses`, () => {
+      const [lesson, id] = ref.split("/");
+      const task = getLesson(lesson)!.labTasks.find((t) => t.id === id)!;
+      expect(task.match(hit)).toBe(true);
+      for (const m of miss) expect(task.match(m)).toBe(false);
+    });
+  }
+});
+
+describe("module 3 attacks", () => {
+  it("declares the brief's attacks", () => {
+    const attacks = (id: string) => getLesson(id)!.attacks.map((a) => `${a.id}:${a.kind}`);
+    expect(attacks("m3-l4")).toEqual(["code-interception:live"]);
+    expect(attacks("m3-l5")).toEqual(["redirect-prefix:live"]);
   });
 });
 

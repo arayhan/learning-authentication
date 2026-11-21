@@ -1,17 +1,161 @@
+import { flows } from "@/content/flows";
+
 <LessonSteps>
   <Step id="hook" title="Hook">
-    Content coming soon.
+    Everything so far had a human in the loop: someone to sign in, someone to click Approve. But a nightly report job, a billing service or a build pipeline has no human and no browser. It still has to call an API, and the API still wants a token.
+
+    For that case OAuth has a much shorter flow, with one request and no redirects.
+
+    <Analogy title="The company badge">
+      A delivery robot at an office has no name or face, so it carries a company badge that opens exactly the doors it is allowed to. The guard checks the badge, not a person. Client credentials is the badge.
+    </Analogy>
   </Step>
 
   <Step id="concept" title="Concept">
-    Content coming soon.
+    The **client credentials grant** (RFC 6749 section 4.4) lets a confidential client get an access token **for itself**. There is no resource owner, no consent page and no authorization code.
+
+    <SequenceFlow flow={flows.clientCredentials} />
+
+    The client sends `POST /token` with `grant_type=client_credentials`, an optional `scope`, and authenticates itself. The most common way is HTTP Basic, with the client id and secret joined by a colon and base64 encoded (RFC 6749 section 2.3.1). The answer is an access token and no refresh token.
+
+    Points worth remembering:
+
+    - **The subject is the client.** The token's `sub` is `demo-backend`, not a user. An API must not treat such a token as a user's.
+    - **The scope is capped by registration.** The client may ask for less than it is allowed, never more: `scope=profile` for `demo-backend` gives `invalid_scope`.
+    - **No refresh token.** The client can authenticate again whenever it needs a token, so a long-lived refresh token would add risk and no benefit.
+    - **Wrong secret: `401 invalid_client`**, with a `WWW-Authenticate: Basic` header (RFC 6749 section 5.2).
+    - **Only for confidential clients.** The secret must stay on a server. Browser and mobile apps cannot use this grant.
+
+    How the two main grants compare:
+
+    | | **Authorization code + PKCE** | **Client credentials** |
+    |---|---|---|
+    | A user is involved | Yes, signs in and consents | No |
+    | Browser and redirects | Yes | None |
+    | Token is about | The user, granted to the client | The client itself |
+    | Client authentication | Public: PKCE. Confidential: secret too | Secret or key, always |
+    | Refresh token | Possible | Not issued |
+    | Typical use | A user's app acting for them | Service to service, jobs, automation |
+
+    <Callout type="warn">
+      A shared secret is a password for a program. Keep it in a secrets manager, never in the repository or an image, give each service its own, and rotate it. Stronger client authentication exists, such as signed JWT assertions or mutual TLS (RFC 7523, RFC 8705), and removes the shared secret altogether.
+    </Callout>
   </Step>
 
   <Step id="check" title="Check">
-    Content coming soon.
+    Three questions. Every answer has to be right, but you can try as often as you like.
+
+    <Quiz id="q1" gate />
+  </Step>
+
+  <Step id="lab" title="Lab">
+    Be the backend job. The console below calls `POST /token` as `demo-backend` (secret `lab-secret`), using HTTP Basic.
+
+    <LabTasks />
+
+    <LabConsole
+      lab="03"
+      actions={[
+        {
+          label: "Get a token",
+          method: "POST",
+          path: "/token",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOmxhYi1zZWNyZXQ=" },
+          body: "grant_type=client_credentials&scope=photos.read",
+        },
+        {
+          label: "Wrong secret",
+          method: "POST",
+          path: "/token",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOm5vcGU=" },
+          body: "grant_type=client_credentials",
+        },
+        {
+          label: "Ask for a scope it lacks",
+          method: "POST",
+          path: "/token",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic ZGVtby1iYWNrZW5kOmxhYi1zZWNyZXQ=" },
+          body: "grant_type=client_credentials&scope=profile",
+        },
+      ]}
+    />
+
+    1. Click **Get a token**. The answer is `200` with `access_token`, `token_type`, `expires_in` and `scope`: `photos.read`. There is no `refresh_token`.
+    2. Click **Wrong secret**. You get `401` with `invalid_client` and a `WWW-Authenticate: Basic` header.
+    3. Click **Ask for a scope it lacks**. You get `400 invalid_scope`: `profile` is not among `demo-backend`'s registered scopes.
+    4. Decode the token from step 1 the way you did in Module 2 (it is base64url JSON in the middle segment). Both `sub` and `client_id` are `demo-backend`.
+
+    Then use it. The API is on a different port, so copy the `access_token` from the console and call it with `curl` (port `4123` for Go, `4223` for TypeScript):
+
+    ```bash
+    curl -i http://localhost:4123/api/photos -H "Authorization: Bearer TOKEN"
+    ```
+
+    The API treated it like any other valid token: it checked the signature, issuer, audience and expiry, saw `photos.read`, and answered `200`. It never needed to know that no user was involved.
+  </Step>
+
+  <Step id="code" title="Code">
+    The whole grant is one handler. Three decisions are visible: authenticate the client, cap the scope, and make the client its own subject.
+
+    <CodeTabs
+      go="labs/03-oauth-pkce/go/as.go#L442-L468"
+      ts="labs/03-oauth-pkce/ts/src/as.ts#L223-L241"
+      notes={{
+        443: "The Basic header gives the client id and secret.",
+        445: "Unknown client, wrong grant type or wrong secret all give the same invalid_client.",
+        452: "Requested scope must be a subset of the client's registered scope.",
+        459: "sub is the client itself: there is no user.",
+        224: "The Basic header gives the client id and secret.",
+        228: "Unknown client, wrong grant type or wrong secret all give the same invalid_client.",
+        233: "Requested scope must be a subset of the client's registered scope.",
+        238: "sub is the client itself: there is no user.",
+      }}
+    />
   </Step>
 
   <Step id="recap" title="Recap">
-    Content coming soon.
+    <RecapCard
+      bullets={[
+        "Client credentials gives a confidential client a token for itself: no user, no redirect, no consent.",
+        "The client authenticates with its secret (HTTP Basic or a stronger method) and may request only scopes it is registered for.",
+        "The token's subject is the client. There is no refresh token: the client just asks again.",
+        "Never use it from a browser or mobile app, which cannot keep the secret.",
+        "A wrong secret is 401 invalid_client, a scope outside the registration is 400 invalid_scope.",
+      ]}
+      interview={[
+        {
+          q: "When would you use the client credentials grant?",
+          a: "For machine-to-machine calls where no user is involved, such as a backend service, a scheduled job or an integration. The service authenticates with its own credential and gets a token that represents the service itself, with the scopes it is registered for.",
+        },
+        {
+          q: "Why does client credentials not issue a refresh token?",
+          a: "A refresh token exists to avoid asking the user to sign in again. There is no user here, and the client can authenticate again whenever it wants. A long-lived refresh token would just be another credential to protect.",
+        },
+        {
+          q: "Can a single-page app use client credentials?",
+          a: "No. The secret would have to be in the browser, where everyone can read it, and anyone could then mint tokens as that client. Browser apps are public clients and use the authorization code flow with PKCE.",
+        },
+        {
+          q: "How does an API know a token came from client credentials and not from a user?",
+          a: "By the claims: the subject is the client's id rather than a user id, and there is no user-bound context. The API should decide per endpoint whether it accepts machine tokens, user tokens or both, and it should check scopes in either case.",
+        },
+      ]}
+    />
+
+    <ExplainBack
+      prompt="Explain to a teammate when to pick client credentials over the authorization code flow, and what the token represents."
+      rubric={[
+        "Client credentials is for service-to-service calls with no user present",
+        "The token represents the client itself, not a user",
+        "The client authenticates with its own secret, and the secret must stay on a server",
+        "When the user's data or consent is involved, use the authorization code flow with PKCE",
+      ]}
+    />
+
+    <Callout type="info">
+      **Coming in Phase 2.** In Phase 2 you will build the single sign-on you have been preparing for. Here is how the flow from lesson 2 could map onto the parts in your plan: **sso-frontend** (Next.js), **sso-backend** (Go), **core-api** (Go) and **platforms A, B and C** (Next.js). It is a preview of the shape, not a design, and it says nothing about how those services are built inside.
+    </Callout>
+
+    <SequenceFlow flow={flows.ssoPreview} />
   </Step>
 </LessonSteps>
