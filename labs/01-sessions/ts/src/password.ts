@@ -15,10 +15,15 @@ export async function verifyPassword(phc: string, password: string): Promise<boo
   }
 }
 
-let dummy: Promise<string> | undefined;
+let dummy: string | undefined;
+
+/** Runs once at startup; main exits if it throws (no lazy cache, no empty fallback). */
+export async function initDummyHash(): Promise<void> {
+  dummy = await hashPassword("dummy-password-for-timing");
+}
 
 /** Burns the same argon2 time as a real check, so an unknown email costs what a wrong password does. */
 export async function dummyVerify(password: string): Promise<void> {
-  dummy ??= hashPassword("dummy-password-for-timing");
-  await verifyPassword(await dummy, password);
+  if (!dummy) throw new Error("initDummyHash() was not called");
+  await verifyPassword(dummy, password);
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
-	"sync"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -58,13 +57,13 @@ func verifyPassword(phc, password string) bool {
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
-var (
-	dummyOnce sync.Once
-	dummyPHC  string
-)
+var dummyPHC string
+
+// initDummyHash runs once at startup; main exits if it fails (no lazy cache, no empty fallback).
+func initDummyHash() (err error) {
+	dummyPHC, err = hashPassword("dummy-password-for-timing")
+	return
+}
 
 // dummyVerify burns the same argon2 time as a real check, so an unknown email costs what a wrong password does.
-func dummyVerify(password string) {
-	dummyOnce.Do(func() { dummyPHC, _ = hashPassword("dummy-password-for-timing") })
-	verifyPassword(dummyPHC, password)
-}
+func dummyVerify(password string) { verifyPassword(dummyPHC, password) }

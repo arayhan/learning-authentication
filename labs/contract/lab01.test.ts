@@ -1,10 +1,16 @@
 // Lab 01 contract: runs against ONE live implementation (LAB_BASE_URL) via scripts/contract.mjs.
 // Set OTHER_URL to the other implementation to also run the cross-impl interop test.
-import { beforeAll, describe, expect, test } from "vitest";
+import { createHash } from "node:crypto";
+import postgres from "postgres";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 const IMPL = process.env.LAB_IMPL ?? "go";
 const BASE = process.env.LAB_BASE_URL ?? `http://127.0.0.1:${IMPL === "go" ? 4101 : 4201}`;
 const OTHER = process.env.OTHER_URL;
+const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://academy:academy@localhost:5433/labs";
+const sql = postgres(DATABASE_URL, { onnotice: () => {} });
+afterAll(() => sql.end());
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const PASSWORD = "correct horse battery";
 const VULN = { "X-Lab-Mode": "vulnerable" };
 
@@ -77,6 +83,18 @@ describe(`lab01 contract (${IMPL} @ ${BASE})`, () => {
       expect((await call("/register", { body: { email: "no-at-sign", password: PASSWORD } })).status).toBe(400);
       expect((await call("/register", { body: { email: `${"a".repeat(250)}@x.io`, password: PASSWORD } })).status).toBe(400);
     });
+    test("trailing garbage after the JSON value → 400 invalid json", async () => {
+      for (const raw of [`{"email":"a@b.io","password":"correct horse"} x`, `{"email":"a@b.io","password":"correct horse"}{}`]) {
+        const r = await call("/register", { raw });
+        expect(r.status).toBe(400);
+        expect(r.json).toEqual({ error: "invalid json" });
+      }
+    });
+    test("body over 1 MiB → 413 body too large", async () => {
+      const r = await call("/register", { raw: JSON.stringify({ email: email(), password: "x".repeat(1_200_000) }) });
+      expect(r.status).toBe(413);
+      expect(r.json).toEqual({ error: "body too large" });
+    });
     test("malformed JSON → 400 invalid json", async () => {
       const r = await call("/register", { raw: "{nope" });
       expect(r.status).toBe(400);
@@ -120,6 +138,24 @@ describe(`lab01 contract (${IMPL} @ ${BASE})`, () => {
       expect(Number.isInteger(ra)).toBe(true);
       expect(ra).toBeGreaterThanOrEqual(1);
       expect(ra).toBeLessThanOrEqual(900);
+    });
+
+    test("10 concurrent wrong-password logins: at most 5 are 401, the rest 429", async () => {
+      const e = email();
+      await call("/register", { body: { email: e, password: PASSWORD } });
+      const rs = await Promise.all(Array.from({ length: 10 }, () => call("/login", { body: { email: e, password: "wrong password!" } })));
+      const codes = rs.map((r) => r.status);
+      expect(codes.filter((s) => s === 401).length).toBeLessThanOrEqual(5);
+      expect(codes.filter((s) => s === 429).length).toBe(10 - codes.filter((s) => s === 401).length);
+      expect(codes.every((s) => s === 401 || s === 429)).toBe(true);
+    });
+
+    test("login, register and /me responses are Cache-Control: no-store", async () => {
+      const a = await registerAndLogin();
+      expect(a.login.headers.get("cache-control")).toBe("no-store");
+      expect((await call("/login", { body: { email: a.email, password: "wrong password!" } })).headers.get("cache-control")).toBe("no-store");
+      expect((await call("/register", { body: { email: email(), password: PASSWORD } })).headers.get("cache-control")).toBe("no-store");
+      expect((await call("/me", { sid: a.sid })).headers.get("cache-control")).toBe("no-store");
     });
 
     test("unknown emails are rate limited too", async () => {
@@ -209,6 +245,25 @@ describe(`lab01 contract (${IMPL} @ ${BASE})`, () => {
     });
   });
 
+  describe("storage", () => {
+    test("sessions table holds sha256(sid), never the raw cookie value", async () => {
+      const a = await registerAndLogin();
+      const hashed = await sql`SELECT id FROM lab01.sessions WHERE id = ${sha256(a.sid)}`;
+      expect(hashed.length).toBe(1);
+      const raw = await sql`SELECT id FROM lab01.sessions WHERE id = ${a.sid}`;
+      expect(raw.length).toBe(0);
+    });
+
+    test("expired session (expires_at in the past) → /me 401 and /transfer 401", async () => {
+      const a = await registerAndLogin();
+      expect((await call("/me", { sid: a.sid })).status).toBe(200);
+      await sql`UPDATE lab01.sessions SET expires_at = now() - interval '1 minute' WHERE id = ${sha256(a.sid)}`;
+      expect((await call("/me", { sid: a.sid })).status).toBe(401);
+      expect((await call("/transfer", { body: { to: "bob", amount: 1 }, sid: a.sid, csrf: a.csrf })).status).toBe(401);
+      expect((await call("/transfer", { body: { to: "bob", amount: 1 }, sid: a.sid, headers: VULN })).status).toBe(401);
+    });
+  });
+
   describe("attack helpers", () => {
     test("/__attack/* → 404 without vulnerable header", async () => {
       expect((await call("/__attack/plant-sid", { body: { sid: "abc" } })).status).toBe(404);
@@ -231,8 +286,15 @@ describe(`lab01 contract (${IMPL} @ ${BASE})`, () => {
       expect(bad.json.status).toBe(401);
     });
 
+    test("as refuses to replay /__trace (endless SSE): 400, promptly", async () => {
+      const t = Date.now();
+      const r = await call("/__attack/as", { body: { sid: "x", path: "/__trace" }, headers: VULN });
+      expect(r.status).toBe(400);
+      expect(Date.now() - t).toBeLessThan(2000);
+    });
+
     test("as rejects paths not starting with / or starting with /__attack", async () => {
-      for (const path of ["me", "http://evil.test/me", "/__attack/as", "/__attack/plant-sid"]) {
+      for (const path of ["me", "http://evil.test/me", "/__attack/as", "/__attack/plant-sid", "/__trace", "/__x"]) {
         expect((await call("/__attack/as", { body: { sid: "x", path }, headers: VULN })).status).toBe(400);
       }
     });

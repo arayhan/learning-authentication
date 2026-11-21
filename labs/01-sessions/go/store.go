@@ -56,26 +56,51 @@ func (s *Store) CreateUser(ctx context.Context, email, phc string) (id string, e
 	return id, err
 }
 
-// UserByEmail returns ok=false (and no error) when the email is unknown.
-func (s *Store) UserByEmail(ctx context.Context, email string) (id, phc string, ok bool, err error) {
-	err = s.db.QueryRow(ctx, `SELECT id::text, password_hash FROM lab01.users WHERE email = $1`, email).Scan(&id, &phc)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", "", false, nil
+type LoginOutcome int
+
+const (
+	LoginOK LoginOutcome = iota
+	LoginRejected
+	LoginBlocked
+)
+
+const maxFailures = 5
+
+// Authenticate runs rate-limit check, password verify and failure bookkeeping as ONE transaction serialized per
+// email by an advisory lock. Without the lock, N parallel guesses all read "0 failures" before any failure is
+// written, so the limit would not bind. verify gets found=false for an unknown email (burn dummy argon2 time there).
+// Failed logins insert a row; a successful login does NOT clear history (shortcut: a real system would decay per account).
+func (s *Store) Authenticate(ctx context.Context, email string, verify func(phc string, found bool) bool) (userID string, out LoginOutcome, retryAfter int, err error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return "", 0, 0, err
 	}
-	return id, phc, err == nil, err
-}
-
-func (s *Store) RecordFailure(ctx context.Context, email string) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO lab01.login_failures (email) VALUES ($1)`, email)
-	return err
-}
-
-// Failures counts failures in the last 15 minutes and the seconds (>= 1) until the oldest one ages out.
-// Successful logins do not clear history: shortcut, a real system would reset or decay per account.
-func (s *Store) Failures(ctx context.Context, email string) (count, retryAfter int, err error) {
-	err = s.db.QueryRow(ctx, `
+	defer tx.Rollback(ctx) // no-op after Commit
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email); err != nil {
+		return
+	}
+	var count int
+	err = tx.QueryRow(ctx, `
 SELECT count(*)::int,
        COALESCE(GREATEST(CEIL(EXTRACT(EPOCH FROM (min(at) + interval '15 minutes' - now()))), 1), 1)::int
 FROM lab01.login_failures WHERE email = $1 AND at > now() - interval '15 minutes'`, email).Scan(&count, &retryAfter)
-	return
+	if err != nil {
+		return
+	}
+	if count >= maxFailures {
+		return "", LoginBlocked, retryAfter, nil
+	}
+	var phc string
+	err = tx.QueryRow(ctx, `SELECT id::text, password_hash FROM lab01.users WHERE email = $1`, email).Scan(&userID, &phc)
+	found := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return
+	}
+	if verify(phc, found) {
+		return userID, LoginOK, 0, tx.Commit(ctx)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO lab01.login_failures (email) VALUES ($1)`, email); err != nil {
+		return
+	}
+	return "", LoginRejected, 0, tx.Commit(ctx)
 }

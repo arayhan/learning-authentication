@@ -37,6 +37,9 @@ func loadUI() []byte {
 }
 
 func main() {
+	if err := initDummyHash(); err != nil {
+		log.Fatalf("lab01: dummy hash: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	store, err := openStore(ctx, env("DATABASE_URL", "postgres://academy:academy@localhost:5433/labs"))
 	cancel()

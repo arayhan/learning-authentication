@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -17,7 +19,6 @@ import (
 
 const (
 	allowedOrigin = "http://localhost:3000"
-	maxFailures   = 5
 	maxBody       = 1 << 20
 )
 
@@ -36,15 +37,15 @@ func newServer(store *Store, ui []byte, hub *trace.Hub) *Server {
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /__trace", hub.SSE())
-	mux.HandleFunc("POST /register", s.register)
-	mux.HandleFunc("POST /login", s.login)
-	mux.HandleFunc("GET /me", s.me)
+	mux.HandleFunc("POST /register", noStore(s.register))
+	mux.HandleFunc("POST /login", noStore(s.login))
+	mux.HandleFunc("GET /me", noStore(s.me))
 	mux.HandleFunc("POST /logout", s.logout)
 	mux.HandleFunc("POST /transfer", s.transfer)
 	mux.HandleFunc("POST /__attack/plant-sid", s.plantSid)
 	mux.HandleFunc("POST /__attack/as", s.attackAs)
 	mux.HandleFunc("/", notFound)
-	s.handler = cors(trace.Middleware(hub, "01", "go", "app")(mux))
+	s.handler = cors(limitBody(trace.Middleware(hub, "01", "go", "app")(mux)))
 	return s
 }
 
@@ -70,6 +71,27 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
+// noStore: responses that carry credentials or identity must never sit in a shared or browser cache.
+func noStore(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		h(w, r)
+	}
+}
+
+// limitBody buffers at most maxBody bytes BEFORE the trace middleware (which reads whole bodies), else 413.
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
+		if err != nil || len(b) > maxBody {
+			writeError(w, 413, "body too large")
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(b))
+		next.ServeHTTP(w, r)
+	})
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	b, _ := json.Marshal(v) // json.Marshal (not Encoder): no trailing newline, so bodies match the TS lab byte for byte
 	w.Header().Set("Content-Type", "application/json")
@@ -77,7 +99,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Write(b)
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) { writeJSON(w, status, map[string]string{"error": msg}) }
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
 
 func serverError(w http.ResponseWriter, err error) {
 	log.Printf("internal error: %v", err)
@@ -92,8 +116,9 @@ func vulnerable(r *http.Request) bool { return r.Header.Get("X-Lab-Mode") == "vu
 // readJSON accepts only a JSON object sent as application/json.
 func readJSON(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 	var m map[string]any
+	dec := json.NewDecoder(r.Body)
 	ct := strings.ToLower(strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0]))
-	if ct != "application/json" || json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&m) != nil || m == nil {
+	if ct != "application/json" || dec.Decode(&m) != nil || m == nil || dec.Decode(&struct{}{}) != io.EOF { // second decode: trailing garbage is an error
 		writeError(w, 400, "invalid json")
 		return nil, false
 	}
@@ -161,32 +186,22 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	count, retryAfter, err := s.store.Failures(ctx, email)
-	if err != nil {
+	userID, outcome, retryAfter, err := s.store.Authenticate(ctx, email, func(phc string, found bool) bool {
+		if !found {
+			dummyVerify(password) // same cost as a real verify: unknown email must not be timing-distinguishable
+			return false
+		}
+		return verifyPassword(phc, password)
+	})
+	switch {
+	case err != nil:
 		serverError(w, err)
 		return
-	}
-	if count >= maxFailures {
+	case outcome == LoginBlocked:
 		w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 		writeError(w, 429, "too many attempts")
 		return
-	}
-	userID, phc, found, err := s.store.UserByEmail(ctx, email)
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	if found {
-		ok = verifyPassword(phc, password)
-	} else {
-		dummyVerify(password) // same cost as a real verify: unknown email must not be timing-distinguishable
-		ok = false
-	}
-	if !ok {
-		if err := s.store.RecordFailure(ctx, email); err != nil {
-			serverError(w, err)
-			return
-		}
+	case outcome == LoginRejected:
 		writeError(w, 401, "invalid credentials") // identical for unknown email and wrong password
 		return
 	}
@@ -199,7 +214,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if vulnerable(r) && sidRe.MatchString(incoming) {
 		token = incoming // VULNERABLE: session fixation. The attacker-chosen id becomes the authenticated session.
 	} else if incoming != "" {
-		s.store.DeleteSession(ctx, incoming) // secure: rotate, and kill whatever session the client presented
+		if err := s.store.DeleteSession(ctx, incoming); err != nil { // secure: rotate, and kill whatever session the client presented
+			serverError(w, err)
+			return
+		}
 	}
 	csrf, err := s.store.CreateSession(ctx, token, userID)
 	if err != nil {
@@ -306,7 +324,7 @@ func (s *Server) attackAs(w http.ResponseWriter, r *http.Request) {
 	}
 	sid, _ := str(m, "sid")
 	path, _ := str(m, "path")
-	if !sidRe.MatchString(sid) || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "/__attack") {
+	if !sidRe.MatchString(sid) || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "/__") {
 		writeError(w, 400, "invalid sid or path")
 		return
 	}
