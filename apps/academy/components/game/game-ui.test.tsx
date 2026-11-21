@@ -2,7 +2,11 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: push, refresh: vi.fn() }) }));
 import { course } from "@/lib/course/registry";
 import { BadgeShelf } from "./BadgeShelf";
 import { ProgressProvider, useProgress } from "./ProgressProvider";
@@ -31,6 +35,13 @@ describe("SkillMap", () => {
     rerender(<SkillMap completed={refs("m1-l1")} />);
     expect(stateOf(container, "m1-l1")).toBe("done");
     expect(stateOf(container, "m1-l2")).toBe("available");
+  });
+
+  it("unlocks m1-l2 once every STEP of m1-l1 is done, even if its quiz is not", () => {
+    const { container } = render(<SkillMap completed={refs("m1-l1", "steps")} />);
+    expect(stateOf(container, "m1-l1")).toBe("available");
+    expect(stateOf(container, "m1-l2")).toBe("available");
+    expect(stateOf(container, "m1-l3")).toBe("locked");
   });
 
   it("links available lessons to /m/<module>/<lesson> and not locked ones", () => {
@@ -94,5 +105,60 @@ describe("useProgress", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
+
+  describe("re-login dialog", () => {
+    function Probe() {
+      const { send, reauthCount } = useProgress();
+      const [typed, setTyped] = useState("");
+      return (
+        <>
+          <input aria-label="draft" value={typed} onChange={(e) => setTyped(e.target.value)} />
+          <span data-testid="count">{reauthCount}</span>
+          <button onClick={() => void send({ kind: "step", ref: "m1-l1/hook" })}>go</button>
+        </>
+      );
+    }
+    const stub = (login: Response) => {
+      const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/login") return login;
+        return init?.method === "POST" ? json(401, { error: "Unauthorized" }) : json(200, initial);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    };
+    const open = async () => {
+      render(<ProgressProvider initial={initial}><Probe /></ProgressProvider>);
+      await userEvent.type(screen.getByLabelText("draft"), "my notes");
+      await userEvent.click(screen.getByText("go"));
+      await screen.findByRole("dialog");
+      await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
+      await userEvent.type(screen.getByLabelText("Password"), "password123");
+      await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    };
+
+    it("posts credentials, closes, bumps reauthCount and keeps page state without navigating", async () => {
+      push.mockClear();
+      const fetchMock = stub(json(200, { ok: true }));
+      await open();
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      const call = fetchMock.mock.calls.find(([u]) => u === "/api/auth/login")!;
+      expect(call[1]?.method).toBe("POST");
+      expect(JSON.parse(call[1]!.body as string)).toEqual({ email: "a@b.co", password: "password123" });
+      expect(screen.getByTestId("count")).toHaveTextContent("1");
+      expect(screen.getByLabelText("draft")).toHaveValue("my notes");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("shows the server error and stays open on a failed re-login", async () => {
+      push.mockClear();
+      stub(json(401, { error: "Invalid email or password" }));
+      await open();
+      expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("count")).toHaveTextContent("0");
+      expect(screen.getByLabelText("draft")).toHaveValue("my notes");
+      expect(push).not.toHaveBeenCalled();
+    });
   });
 });

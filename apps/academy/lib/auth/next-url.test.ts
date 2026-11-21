@@ -6,7 +6,10 @@ describe("safeNext", () => {
     expect(safeNext("/m/a/b?x=1")).toBe("/m/a/b?x=1");
     expect(safeNext(["/", "/x"])).toBe("/");
   });
-  it.each(["//evil.com", "/\\evil.com", "https://evil.com", "evil", "", undefined])("rejects %s", (v) => {
+  it.each([
+    "//evil.com", "/\\evil.com", "https://evil.com", "evil", "", undefined,
+    "/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "/ /evil.com", "/\u0000/evil.com",
+  ])("rejects %j", (v) => {
     expect(safeNext(v)).toBeUndefined();
   });
 });
