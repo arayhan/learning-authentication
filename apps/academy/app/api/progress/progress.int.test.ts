@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { quizAttempts, xpEvents } from "@/lib/db/schema";
@@ -115,6 +115,7 @@ test("cross-origin POST → 403", async () => {
 test("completing all m1 refs grants cookie-monster in newBadges exactly once", async () => {
   const m1 = course[0];
   const seen: string[] = [];
+  let lastBoss: unknown;
   for (const ref of moduleRefs(m1)) {
     const { kind } = resolveRef(ref)!;
     const quiz = getLesson(ref.split("/")[0])!.quizzes.find((q) => `${q.id}` === ref.split("/")[1]);
@@ -122,6 +123,7 @@ test("completing all m1 refs grants cookie-monster in newBadges exactly once", a
       kind === "quiz" ? { kind, ref, answers: quiz!.questions.map((q) => q.answer) }
       : kind === "boss" ? { kind, ref, answers: quiz!.questions.map((q) => q.answer), elapsedMs: 1000 }
       : { kind, ref };
+    if (kind === "boss") lastBoss = event;
     const r = await post(event);
     expect(r.gained).toBeGreaterThan(0);
     seen.push(...r.newBadges);
@@ -131,5 +133,28 @@ test("completing all m1 refs grants cookie-monster in newBadges exactly once", a
   const g = await (await GET(new NextRequest(`${base}?tz=UTC`, { headers: { cookie, host: "localhost:3000" } }))).json();
   expect(g.badges).toContain("cookie-monster");
   // replaying the last ref yields no new badge
-  expect((await post({ kind: "boss", ref: "m1-l7/boss", answers: [0], elapsedMs: 1000 })).newBadges).toEqual([]);
+  expect((await post(lastBoss)).newBadges).toEqual([]);
+});
+
+describe("flawless", () => {
+  const ref = "m1-l7/boss";
+  const perfect = () => getLesson("m1-l7")!.quizzes.find((q) => q.id === "boss")!.questions.map((q) => q.answer);
+  const badgesAfterStep = async () => (await post({ kind: "step", ref: "m1-l1/hook" })).badges;
+
+  test("timed-out perfect boss -> 422, no flawless on a later award", async () => {
+    const res = await rawPost({ event: { kind: "boss", ref, answers: perfect(), elapsedMs: 10_000_000 }, tz: "UTC" });
+    expect(res.status).toBe(422);
+    expect(await badgesAfterStep()).not.toContain("flawless");
+  });
+
+  test("over-long all-correct answers -> 422, no flawless", async () => {
+    const res = await rawPost({ event: { kind: "boss", ref, answers: [...perfect(), 0], elapsedMs: 1000 }, tz: "UTC" });
+    expect(res.status).toBe(422);
+    expect(await badgesAfterStep()).not.toContain("flawless");
+  });
+
+  test("in-time perfect boss -> flawless", async () => {
+    const r = await post({ kind: "boss", ref, answers: perfect(), elapsedMs: 1000 });
+    expect(r.newBadges).toContain("flawless");
+  });
 });

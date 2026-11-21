@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { badges, lessonProgress, quizAttempts, xpEvents } from "@/lib/db/schema";
 import { course, resolveRef } from "@/lib/course/registry";
@@ -60,7 +60,7 @@ export async function award(userId: string, e: XpEvent, tz: string): Promise<Awa
   if (e.kind === "quiz" || e.kind === "boss") {
     const quiz = info.lesson.quizzes.find((q) => `${info.lesson.id}/${q.id}` === e.ref)!;
     const r = gradeQuiz(quiz, e.answers, e.kind === "boss" ? e.elapsedMs : undefined);
-    await db.insert(quizAttempts).values({ userId, quizRef: e.ref, score: r.score, total: r.total });
+    await db.insert(quizAttempts).values({ userId, quizRef: e.ref, score: r.score, total: r.total, passed: r.passed });
     if (!r.passed) throw new QuizFailed(r.score, r.total);
   }
 
@@ -75,9 +75,17 @@ export async function award(userId: string, e: XpEvent, tz: string): Promise<Awa
   });
 
   const state = await getProgress(userId, tz);
-  const perfectBoss = (await db.select().from(quizAttempts).where(eq(quizAttempts.userId, userId))).some(
-    (a) => bossRefs.has(a.quizRef) && a.score === a.total,
-  );
+  const [flawless] = await db
+    .select({ id: quizAttempts.id })
+    .from(quizAttempts)
+    .where(and(
+      eq(quizAttempts.userId, userId),
+      inArray(quizAttempts.quizRef, [...bossRefs]),
+      eq(quizAttempts.passed, true),
+      sql`${quizAttempts.score} = ${quizAttempts.total}`,
+    ))
+    .limit(1);
+  const perfectBoss = !!flawless;
   const earned = evaluateBadges({ completed: new Set(state.completed), perfectBoss, streak: state.streak });
   const inserted = earned.length
     ? await db

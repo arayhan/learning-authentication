@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   primaryKey,
@@ -63,5 +64,6 @@ export const quizAttempts = pgTable("quiz_attempts", {
   quizRef: text("quiz_ref").notNull(),
   score: integer("score").notNull(),
   total: integer("total").notNull(),
+  passed: boolean("passed").notNull().default(false),
   createdAt: createdAt(),
 });
