@@ -61,6 +61,22 @@ describe("trace middleware", () => {
     expect(f!.req.body).toBe("a=2&client_secret=%5Bredacted%5D&password=%5Bredacted%5D&z=1");
   });
 
+  it("form redaction is pairwise and fails closed on malformed input", async () => {
+    const { hub, app } = setup();
+    const cases: [string, string][] = [
+      ["password=100%&x=1", "password=%5Bredacted%5D&x=1"],
+      ["x=1;y&password=a;b", "password=%5Bredacted%5D&x=1;y"],
+      ["b=2&a=%7E*&client_secret=s", "a=%7E*&b=2&client_secret=%5Bredacted%5D"],
+      ["pass%77ord=z", "pass%77ord=%5Bredacted%5D"],
+    ];
+    for (const [body] of cases) {
+      await app.request("/ping", {
+        method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body,
+      });
+    }
+    expect(hub.recent().map((e) => e.req.body)).toEqual(cases.map(([, want]) => want));
+  });
+
   it("truncates bodies to 4096 bytes and keeps query", async () => {
     const { hub, app } = setup();
     await app.request("/ping?x=1&y=2", { method: "POST", body: "a".repeat(5000) });

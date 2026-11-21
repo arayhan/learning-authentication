@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -38,6 +39,33 @@ func redactJSON(v any) any {
 	return v
 }
 
+// redactForm is pairwise text redaction: fails closed on malformed input and
+// keeps each non-secret pair's raw text.
+func redactForm(raw string) string {
+	type pair struct{ key, text string }
+	var pairs []pair
+	for _, p := range strings.Split(raw, "&") {
+		if p == "" {
+			continue
+		}
+		rawKey, _, _ := strings.Cut(p, "=")
+		key, err := url.QueryUnescape(rawKey) // '+' -> ' ', then percent-decode
+		if err != nil {
+			key = rawKey
+		}
+		if isRedacted(key) {
+			p = rawKey + "=%5Bredacted%5D"
+		}
+		pairs = append(pairs, pair{key, p})
+	}
+	sort.SliceStable(pairs, func(i, j int) bool { return pairs[i].key < pairs[j].key })
+	texts := make([]string, len(pairs))
+	for i, p := range pairs {
+		texts[i] = p.text
+	}
+	return strings.Join(texts, "&")
+}
+
 // redactBody redacts secrets, then truncates to maxBody bytes. "" means omit.
 func redactBody(raw []byte, contentType string) string {
 	if len(raw) == 0 {
@@ -59,16 +87,7 @@ func redactBody(raw []byte, contentType string) string {
 			}
 		}
 	case strings.Contains(ct, "application/x-www-form-urlencoded"):
-		if q, err := url.ParseQuery(out); err == nil {
-			for k := range q {
-				if isRedacted(k) {
-					for i := range q[k] {
-						q[k][i] = "[redacted]"
-					}
-				}
-			}
-			out = q.Encode() // sorted by key
-		}
+		out = redactForm(out)
 	}
 	if len(out) <= maxBody {
 		return out

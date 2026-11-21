@@ -18,6 +18,18 @@ function sortRedact(v: unknown): unknown {
   return v;
 }
 
+// Pairwise text redaction: fails closed on malformed input, keeps raw pair text.
+function redactForm(raw: string): string {
+  const pairs = raw.split("&").filter((p) => p !== "").map((p) => {
+    const i = p.indexOf("=");
+    const rawKey = i < 0 ? p : p.slice(0, i);
+    let key = rawKey;
+    try { key = decodeURIComponent(rawKey.replace(/\+/g, " ")); } catch { /* use raw key */ }
+    return { key, text: REDACT.has(key) ? `${rawKey}=%5Bredacted%5D` : p };
+  });
+  return pairs.sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0)).map((p) => p.text).join("&");
+}
+
 export function redactBody(raw: string, contentType: string): string | undefined {
   if (raw === "") return undefined;
   let out = raw;
@@ -25,15 +37,7 @@ export function redactBody(raw: string, contentType: string): string | undefined
   if (ct.includes("application/json")) {
     try { out = JSON.stringify(sortRedact(JSON.parse(raw))); } catch { /* keep raw */ }
   } else if (ct.includes("application/x-www-form-urlencoded")) {
-    const groups = new Map<string, string[]>();
-    for (const [k, v] of new URLSearchParams(raw)) {
-      const g = groups.get(k) ?? [];
-      g.push(REDACT.has(k) ? "[redacted]" : v);
-      groups.set(k, g);
-    }
-    const p = new URLSearchParams();
-    for (const k of [...groups.keys()].sort()) for (const v of groups.get(k)!) p.append(k, v);
-    out = p.toString();
+    out = redactForm(raw);
   }
   const bytes = new TextEncoder().encode(out);
   if (bytes.length <= MAX_BODY) return out;

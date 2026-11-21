@@ -100,6 +100,25 @@ func TestRedactFormAndNested(t *testing.T) {
 	}
 }
 
+func TestFormRedactionFailsClosed(t *testing.T) {
+	cases := [][2]string{
+		{"password=100%&x=1", "password=%5Bredacted%5D&x=1"},
+		{"x=1;y&password=a;b", "password=%5Bredacted%5D&x=1;y"},
+		{"b=2&a=%7E*&client_secret=s", "a=%7E*&b=2&client_secret=%5Bredacted%5D"},
+		{"pass%77ord=z", "pass%77ord=%5Bredacted%5D"},
+	}
+	h := NewHub(200)
+	app := newApp(h)
+	for _, c := range cases {
+		do(app, "POST", "/ping", "application/x-www-form-urlencoded", c[0])
+	}
+	for i, e := range h.Recent() {
+		if e.Req.Body != cases[i][1] {
+			t.Errorf("%q: got %q want %q", cases[i][0], e.Req.Body, cases[i][1])
+		}
+	}
+}
+
 func TestTruncateAndQuery(t *testing.T) {
 	h := NewHub(200)
 	do(newApp(h), "POST", "/ping?x=1&y=2", "", strings.Repeat("a", 5000))
