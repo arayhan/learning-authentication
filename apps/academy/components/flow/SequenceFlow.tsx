@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Database, Globe, KeyRound, type LucideIcon, Pause, Play, RotateCcw, ServerCog, ShieldAlert, User, Waypoints } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { MessageDrawer } from "./MessageDrawer";
 import type { Actor, Flow, FlowStep } from "./types";
@@ -12,6 +12,8 @@ const HEADER = 56;
 const ROW = 56;
 const PLAY_MS = 1600;
 const ICONS: Record<Actor["kind"], LucideIcon> = { user: User, browser: Globe, server: ServerCog, db: Database, attacker: ShieldAlert, as: KeyRound, api: Waypoints };
+
+const subscribeNever = () => () => {};
 
 const tone = (s: FlowStep, isCurrent: boolean) =>
   s.danger ? { stroke: "stroke-destructive", fill: "fill-destructive" } : isCurrent ? { stroke: "stroke-primary", fill: "fill-primary" } : { stroke: "stroke-muted-foreground", fill: "fill-muted-foreground" };
@@ -65,14 +67,17 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
   const [playing, setPlaying] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const reduced = useReducedMotion() ?? false;
+  // false during SSR and the hydration render, true after: keeps server and first client markup identical (arrows fully visible), so reduced-motion users never hydrate into a hidden arrow.
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
   const last = flow.steps.length - 1;
 
   // Advance one step per tick. Reduced motion only drops the draw animation, never the auto-advance.
   useEffect(() => {
     if (!playing) return;
     const id = setTimeout(() => {
-      setStep(step + 1);
-      if (step + 1 >= last) setPlaying(false);
+      const next = Math.min(last, step + 1);
+      setStep(next);
+      if (next >= last) setPlaying(false);
     }, PLAY_MS);
     return () => clearTimeout(id);
   }, [playing, step, last]);
@@ -82,6 +87,7 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
     setStep(Math.min(last, Math.max(0, n)));
   };
   const play = () => {
+    if (last < 1) return;
     if (playing) return setPlaying(false);
     if (step >= last) setStep(0);
     setPlaying(true);
@@ -91,6 +97,7 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
   const width = flow.actors.length * COL;
   const height = HEADER + (flow.steps.length + 0.5) * ROW;
   const cur = flow.steps[step];
+  if (!cur) return <p className="max-w-3xl rounded-lg border bg-card p-3 text-sm text-muted-foreground">No steps in this flow.</p>;
   const opened = open === null ? null : flow.steps[open];
 
   return (
@@ -100,8 +107,9 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
         aria-label={flow.title}
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === "ArrowRight") go(step + 1);
-          else if (e.key === "ArrowLeft") go(step - 1);
+          if (e.altKey || e.metaKey || e.ctrlKey || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
+          e.preventDefault();
+          go(step + (e.key === "ArrowRight" ? 1 : -1));
         }}
         className="max-w-3xl space-y-3 rounded-lg border bg-card p-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
@@ -130,7 +138,7 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
                 x2={xOf(s.to)}
                 y={HEADER + ROW * (i + 0.7)}
                 isCurrent={i === step}
-                animate={!reduced && i === step}
+                animate={mounted && !reduced && i === step}
                 onOpen={s.http ? () => setOpen(i) : undefined}
               />
             ))}
@@ -143,7 +151,7 @@ export function SequenceFlow({ flow }: { flow: Flow }) {
           <Button variant="outline" size="icon-sm" aria-label="Next" disabled={step === last} onClick={() => go(step + 1)}>
             <ChevronRight />
           </Button>
-          <Button variant="outline" size="icon-sm" aria-label={playing ? "Pause" : "Play"} onClick={play}>
+          <Button variant="outline" size="icon-sm" aria-label={playing ? "Pause" : "Play"} disabled={last < 1} onClick={play}>
             {playing ? <Pause /> : <Play />}
           </Button>
           <Button variant="outline" size="icon-sm" aria-label="Reset" onClick={() => go(0)}>

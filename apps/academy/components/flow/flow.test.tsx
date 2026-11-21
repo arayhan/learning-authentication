@@ -2,11 +2,17 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flows } from "@/content/flows";
 import { SequenceFlow } from "./SequenceFlow";
 
+// motion caches the media query at module level, so stubbing matchMedia per test is vacuous. Mock the hook instead.
+const motionPref = vi.hoisted(() => ({ reduced: false }));
+vi.mock("motion/react", async (orig) => ({ ...(await orig<typeof import("motion/react")>()), useReducedMotion: () => motionPref.reduced }));
+
 afterEach(() => {
+  motionPref.reduced = false;
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -67,23 +73,55 @@ describe("SequenceFlow", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("Play still advances with reduced motion, then stops at the end", () => {
-    vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", (q: string) => ({
-      matches: q.includes("prefers-reduced-motion"),
-      media: q,
-      addEventListener() {},
-      removeEventListener() {},
-      addListener() {},
-      removeListener() {},
-    }));
+  // motion renders its `initial` pathLength/opacity as these attributes on the arrow paths.
+  const hidden = (c: Element) => [...c.querySelectorAll('[data-step] path')].some((p) => /stroke-dasharray|opacity/.test(p.outerHTML) || p.getAttribute("pathLength"));
+
+  it("animates the newly drawn arrow when motion is allowed", async () => {
     const { container } = render(<SequenceFlow flow={flow} />);
+    await userEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(hidden(container.querySelector('[data-step="1"]')!.parentElement!)).toBe(true);
+  });
+
+  it("with reduced motion: no draw/fade props on arrows, and Play still advances to the end", () => {
+    vi.useFakeTimers();
+    motionPref.reduced = true;
+    const { container } = render(<SequenceFlow flow={flow} />);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(hidden(container)).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /reset/i }));
     fireEvent.click(screen.getByRole("button", { name: /play/i }));
     act(() => void vi.advanceTimersByTime(1600));
     expect(current(container)).toBe("1");
     for (let i = 0; i < 6; i++) act(() => void vi.advanceTimersByTime(1600)); // each tick re-arms after render
     expect(current(container)).toBe("4");
+    expect(hidden(container)).toBe(false);
     expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+  });
+
+  it("server render (and so the hydration render) has no hidden initial state", () => {
+    const html = renderToString(<SequenceFlow flow={flow} />);
+    expect(html).toContain('data-step="0"');
+    expect(html).not.toMatch(/stroke-dasharray|opacity:\s*0|opacity="0"/);
+  });
+
+  it("a single-step flow: Play cannot run past the end", () => {
+    vi.useFakeTimers();
+    const one = { ...flow, steps: flow.steps.slice(0, 1) };
+    render(<SequenceFlow flow={one} />);
+    fireEvent.click(screen.getByRole("button", { name: /play/i }));
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(screen.getByText(/step 1 of 1/i)).toBeInTheDocument();
+  });
+
+  it("an empty flow renders a fallback without throwing", () => {
+    render(<SequenceFlow flow={{ ...flow, steps: [] }} />);
+    expect(screen.getByText(/no steps/i)).toBeInTheDocument();
+  });
+
+  it("modified arrow keys are ignored", () => {
+    const { container } = render(<SequenceFlow flow={flow} />);
+    fireEvent.keyDown(screen.getByRole("group", { name: flow.title }), { key: "ArrowRight", altKey: true });
+    expect(current(container)).toBe("0");
   });
 
   it("pressing Next pauses Play; Reset returns to step 0", () => {
