@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@academy/trace": "workspace:*",
     "@base-ui/react": "^1.9.0",
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",

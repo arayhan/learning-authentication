@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactCompiler: true,
+  transpilePackages: ["@academy/trace"],
   turbopack: {
     rules: {
       "*.css": {

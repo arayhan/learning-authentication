@@ -1,10 +1,6 @@
-// TODO(task-8): import from @academy/trace
-export type TraceEvent = {
-  id: string; ts: string; lab: "01" | "02" | "03"; impl: "go" | "ts"; role: "app" | "as" | "client" | "api";
-  req: { method: string; path: string; query: string; headers: Record<string, string>; body?: string };
-  res: { status: number; headers: Record<string, string | string[]>; body?: string };
-  durationMs: number;
-};
+import type { TraceEvent } from "@academy/trace";
+
+export type { TraceEvent };
 
 export type ModuleId = "m1" | "m2" | "m3";
 export type LabId = "01" | "02" | "03";

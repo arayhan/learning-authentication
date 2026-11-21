@@ -1,0 +1,23 @@
+{
+  "id": "",
+  "ts": "",
+  "lab": "01",
+  "impl": "x",
+  "role": "app",
+  "req": {
+    "method": "POST",
+    "path": "/login",
+    "query": "",
+    "headers": { "content-type": "application/json" },
+    "body": "{\"email\":\"a@b.c\",\"password\":\"[redacted]\"}"
+  },
+  "res": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "set-cookie": ["sid=abc; HttpOnly; SameSite=Lax; Path=/", "theme=dark; Path=/"]
+    },
+    "body": "{\"ok\":true}"
+  },
+  "durationMs": 0
+}
