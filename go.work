@@ -1,3 +1,6 @@
 go 1.27
 
-use ./packages/trace/go
+use (
+	./labs/01-sessions/go
+	./packages/trace/go
+)

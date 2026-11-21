@@ -1,0 +1,15 @@
+{
+  "name": "@academy/lab01-ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx src/main.ts" },
+  "dependencies": {
+    "@academy/trace": "workspace:*",
+    "@hono/node-server": "^2",
+    "@node-rs/argon2": "^2.2.2",
+    "hono": "^4",
+    "postgres": "^4.1.1"
+  },
+  "devDependencies": { "@types/node": "^20", "tsx": "^4", "typescript": "^5" }
+}
